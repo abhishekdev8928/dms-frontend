@@ -6,10 +6,10 @@ import ResetPassword from "@/pages/auth/ResetPassword";
 import OTPPage from "@/pages/auth/VerifyOtp";
 import Category from "@/pages/dashboard/Category";
 import Department from "@/pages/dashboard/Department";
-// import DocumentUploadUI from "@/pages/dashboard/DocumentUpload";
 import Subcategory from "@/pages/dashboard/subCategory";
 import DepartmentTreeViewer from "@/pages/dashboard/Tree";
 import FileVersionHistory from "@/pages/dashboard/FileVersionHistroy";
+import NotFoundPage from "@/pages/NotFound";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import Home from "@/pages/dashboard/Home";
 
@@ -23,31 +23,30 @@ const router = createBrowserRouter([
     path: "/dashboard",
     element: <DashboardLayout />,
     children: [
-      
-    {
-      index: true,
-      element: <Navigate to="home" replace />,
-    },
-    {
-      path: "home",
-      element: <Home />,
-    },
-    {
-      path: "department",
-      element: <Department />,
-    },
-    {
-      path: "category",
-      element: <Category />,
-    },
-    {
-      path: "subcategory",
-      element: <Subcategory />,
-    },
-    {
-      path: "version-histroy",
-      element: <FileVersionHistory />,
-    }
+      {
+        index: true,
+        element: <Navigate to="home" replace />,
+      },
+      {
+        path: "home",
+        element: <Home />,
+      },
+      {
+        path: "department",
+        element: <Department />,
+      },
+      {
+        path: "category",
+        element: <Category />,
+      },
+      {
+        path: "subcategory",
+        element: <Subcategory />,
+      },
+      {
+        path: "version-histroy",
+        element: <FileVersionHistory />,
+      },
     ],
   },
 
@@ -65,6 +64,12 @@ const router = createBrowserRouter([
   {
     path: "/tree",
     element: <DepartmentTreeViewer />,
+  },
+
+  // 404 catch-all route - must be last
+  {
+    path: "*",
+    element: <NotFoundPage />,
   },
 ]);
 

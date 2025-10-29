@@ -414,12 +414,12 @@ const Subcategory = () => {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleCreateFolder(subcategory)}>
+                            <DropdownMenuItem >
                               <FolderPlus className="mr-2 h-4 w-4" />
                               Create Folder
                             </DropdownMenuItem>
-                            <DropdownMenuItem >
-                              <Upload className="mr-2 h-4 w-4" />
+                            <DropdownMenuItem onClick={() => openDialog({folderId:subcategory?._id})} >
+                              <Upload  className="mr-2 h-4 w-4" />
                               Upload File
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
