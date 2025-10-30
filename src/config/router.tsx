@@ -12,6 +12,7 @@ import FileVersionHistory from "@/pages/dashboard/FileVersionHistroy";
 import NotFoundPage from "@/pages/NotFound";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import Home from "@/pages/dashboard/Home";
+import SimpleUploadDialog from "@/pages/dashboard/UploadFilePanel";
 
 const router = createBrowserRouter([
   {
@@ -47,6 +48,10 @@ const router = createBrowserRouter([
         path: "version-histroy",
         element: <FileVersionHistory />,
       },
+      {
+        path: "upload",
+        element: <SimpleUploadDialog />,
+      }
     ],
   },
 

@@ -1,15 +1,14 @@
+// src/utils/UploadFileHelper.ts
+
 import api from "@/config/axios";
 import { useUploadStore } from "@/config/useUploadStore";
 import axios from "axios";
+import { createDocumentMetadata, createNewVersionMetadata } from "@/config/api/documentApi";
 
-// ✅ Extract correct extension even from complex MIME types
 const getFileExtension = (file: File) => {
-  // 1️⃣ Name-based extraction (most reliable)
   const extFromName = file.name.split(".").pop()?.toLowerCase();
-  
   if (extFromName) return extFromName;
 
-  // 2️⃣ Fallback: MIME normalization
   const mime = file.type.toLowerCase()
     .replace("application/", "")
     .replace("x-", "");
@@ -17,12 +16,37 @@ const getFileExtension = (file: File) => {
   return mime || "unknown";
 };
 
-export const uploadFiles = async (files: File[], folderId?: string, departmentId?: string) => {
+interface UploadOptions {
+  files: File[];
+  folderId?: string;
+  departmentId?: string;
+  isReupload?: boolean;
+  documentId?: string;
+  versionChanges?: string;
+}
+
+export const uploadFiles = async ({
+  files,
+  folderId,
+  departmentId,
+  isReupload = false,
+  documentId,
+  versionChanges,
+}: UploadOptions) => {
   const { addFile, updateProgress, completeUpload, failUpload } =
     useUploadStore.getState();
 
+  // Validation
+  if (isReupload && !documentId) {
+    throw new Error("documentId is required for re-uploads");
+  }
+
+  if (isReupload && files.length > 1) {
+    throw new Error("Re-upload only supports single file");
+  }
+
   try {
-    // ✅ Step 1: Request presigned URLs
+    // Step 1: Request presigned URLs
     const requestPayload = files.map((file) => ({
       filename: file.name,
       mimeType: file.type,
@@ -37,14 +61,14 @@ export const uploadFiles = async (files: File[], folderId?: string, departmentId
       throw new Error("Invalid presigned URL response: expected an array");
     }
 
-    // ✅ Step 2: Upload + Save Metadata
+    // Step 2: Upload + Save Metadata
     await Promise.all(
       presignedFiles.map(async (item: any, index: number) => {
         const file = files[index];
         const uploadId = addFile(file);
 
         try {
-          // ✅ Upload to S3
+          // Upload to S3
           await axios.put(item.url, file, {
             headers: { "Content-Type": file.type },
             onUploadProgress: (e) => {
@@ -53,28 +77,41 @@ export const uploadFiles = async (files: File[], folderId?: string, departmentId
             },
           });
 
-          // ✅ Prepare metadata for DB
-          const metadataBody = {
-            title: file.name,
-            originalFileName: file.name,
-            fileUrl: item.url.split("?")[0],
-            fileKey: item.key,
-            fileType: getFileExtension(file), // ✅ FIX HERE ✅
-            fileSize: file.size,
-            folderId: folderId || null,
-            departmentId: departmentId || null,
-          };
+          const fileUrl = item.url.split("?")[0];
 
-          await api.post("/documents", metadataBody);
+          // CONDITIONAL API CALL BASED ON isReupload FLAG
+          if (isReupload && documentId) {
+            // Call reupload/version API
+            await createNewVersionMetadata(documentId, {
+              fileUrl,
+              fileKey: item.key,
+              fileSize: file.size,
+              changes: versionChanges || `Re-uploaded ${file.name}`,
+            });
+          } else {
+            // Call new document API
+            await createDocumentMetadata({
+              title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
+              originalFileName: file.name,
+              fileUrl,
+              fileKey: item.key,
+              fileType: getFileExtension(file),
+              fileSize: file.size,
+              folderId: folderId || null,
+              departmentId: departmentId || null,
+            });
+          }
 
-          completeUpload(uploadId, item.url);
+          completeUpload(uploadId, fileUrl);
         } catch (error) {
           failUpload(uploadId);
           console.error(`${file.name} upload failed`, error);
+          throw error;
         }
       })
     );
   } catch (error) {
     console.error("Upload process failed:", error);
+    throw error;
   }
 };

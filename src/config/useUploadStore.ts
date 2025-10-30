@@ -1,3 +1,5 @@
+// src/config/useUploadStore.ts
+
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
@@ -11,42 +13,17 @@ export interface UploadFile {
 }
 
 interface UploadStore {
-  folderId: string | null;
-  departmentId: string | null;
-
-  setFolderId: (id: string | null) => void;
-  setDepartmentId: (id: string | null) => void;
-
-  isDialogOpen: boolean;
-  openDialog: (ids?: { folderId?: string; departmentId?: string }) => void;
-  closeDialog: () => void;
-
   uploads: UploadFile[];
   addFile: (file: File) => string;
   updateProgress: (id: string, progress: number) => void;
   completeUpload: (id: string, url?: string) => void;
   failUpload: (id: string) => void;
+  removeUpload: (id: string) => void;
 }
 
 export const useUploadStore = create<UploadStore>()(
   devtools(
     (set) => ({
-      folderId: null,
-      departmentId: null,
-
-      setFolderId: (id) => set({ folderId: id, departmentId: null }),
-      setDepartmentId: (id) => set({ departmentId: id, folderId: null }),
-
-      isDialogOpen: false,
-      openDialog: (ids) =>
-        set({
-          isDialogOpen: true,
-          folderId: ids?.folderId ?? null,
-          departmentId: ids?.departmentId ?? null,
-        }),
-      closeDialog: () =>
-        set({ isDialogOpen: false, folderId: null, departmentId: null }),
-
       uploads: [],
 
       addFile: (file) => {
@@ -79,6 +56,11 @@ export const useUploadStore = create<UploadStore>()(
           uploads: state.uploads.map((u) =>
             u.id === id ? { ...u, status: "error" } : u
           ),
+        })),
+
+      removeUpload: (id) =>
+        set((state) => ({
+          uploads: state.uploads.filter((u) => u.id !== id),
         })),
     }),
     { name: "UploadStore" }

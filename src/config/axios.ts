@@ -2,7 +2,7 @@ import axios from "axios";
 import { useAuthStore } from "./store/useAuthStore"; // Adjust the import path for your store
 
 const api = axios.create({
-  baseURL: "https://dmsdev.run.place/api", // Your base URL
+  baseURL: "http://localhost:3200/api", // Your base URL
   headers: {
     "Content-Type": "application/json", // Standard content type
   },
