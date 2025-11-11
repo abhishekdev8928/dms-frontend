@@ -53,15 +53,13 @@ const getStatusIcon = (status: string) => {
 };
 
 export const GlobalUploadProgress = () => {
-  const {
-    uploads,
-    isOpen,
-    isExpanded,
-    setOpen,
-    toggleExpanded,
-    cancelUpload,
-    clearCompleted,
-  } = useUploadStore.getState();
+ const uploads = useUploadStore((state) => state.uploads);
+  const isOpen = useUploadStore((state) => state.isOpen);
+  const isExpanded = useUploadStore((state) => state.isExpanded);
+  const setOpen = useUploadStore((state) => state.setOpen);
+  const toggleExpanded = useUploadStore((state) => state.toggleExpanded);
+  const cancelUpload = useUploadStore((state) => state.cancelUpload);
+  const clearCompleted = useUploadStore((state) => state.clearCompleted);
 
   if (!isOpen || uploads.length === 0) return null;
 
