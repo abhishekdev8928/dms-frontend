@@ -20,7 +20,7 @@ import { useMutation } from "@tanstack/react-query";
 import { loginUser, type LoginResponse } from "@/config/api/authApi";
 import { useAuthStore } from "@/config/store/authStore";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner"; // or your toast library
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export function LoginForm({
@@ -44,29 +44,20 @@ export function LoginForm({
   });
 
   // Helper function to get formatted date and time
-  const getFormattedDateTime = () => {
-    return new Date().toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  // const getFormattedDateTime = () => {
+  //   return new Date().toLocaleString("en-US", {
+  //     month: "short",
+  //     day: "numeric",
+  //     year: "numeric",
+  //     hour: "2-digit",
+  //     minute: "2-digit",
+  //   });
+  // };
 
   // TanStack Query mutation
   const loginMutation = useMutation<LoginResponse, Error, LoginInput>({
     mutationFn: loginUser,
-    onMutate: () => {
-      // Show loading toast
-      toast.loading("Logging in...", {
-        description: getFormattedDateTime(),
-      });
-    },
     onSuccess: (data) => {
-      // Dismiss loading toast
-      toast.dismiss();
-      
       // Store userId in auth store
       setUnverifiedUser(data.data.userId);
       
@@ -81,8 +72,7 @@ export function LoginForm({
       });
     },
     onError: (error: any) => {
-      // Dismiss loading toast
-      toast.dismiss();
+      console.log("Login error:", error);
       
       // Handle error
       const errorMessage = error?.response?.data?.message || error.message || "Login failed";
@@ -107,7 +97,10 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form 
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+          >
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>

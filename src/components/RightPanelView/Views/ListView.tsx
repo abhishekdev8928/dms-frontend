@@ -94,7 +94,7 @@ export default function ListView({
   };
 
   const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return "-";
+    if (!bytes) return "—";
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     const mb = kb / 1024;
@@ -103,12 +103,6 @@ export default function ListView({
 
   const isFolder = (item: FileItem): boolean =>
     item.type === "folder" || item.itemType === "folder";
-
-  // const handleRowClick = (item: FileItem): void => { {
-  //   if (isFolder(item)) {
-  //     onItemClick(item);
-  //   }
-  // };
 
   const handleSort = (field: SortField): void => {
     if (sortField === field) {
@@ -179,187 +173,264 @@ export default function ListView({
   return (
     <div className="bg-white">
       <TooltipProvider>
-        {/* Header */}
-        <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-200 text-sm font-medium text-gray-700">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className="col-span-5 flex items-center gap-2 cursor-pointer hover:text-gray-900 group"
-                onClick={() => handleSort("name")}
-              >
-                Name
-                <div
-                  className={`transition-opacity ${
-                    sortField === "name"
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100"
-                  }`}
-                >
-                  <SortIcon field="name" />
-                </div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {sortField === "name"
-                  ? `Click to sort ${sortOrder === "asc" ? "Z → A" : "A → Z"}`
-                  : "Sort A → Z"}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-
-          <div className="col-span-2">Owner</div>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className="col-span-3 flex items-center gap-2 cursor-pointer hover:text-gray-900 group"
-                onClick={() => handleSort("date")}
-              >
-                Date Modified
-                <div
-                  className={`transition-opacity ${
-                    sortField === "date"
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100"
-                  }`}
-                >
-                  <SortIcon field="date" />
-                </div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {sortField === "date"
-                  ? `Click to sort ${
-                      sortOrder === "asc"
-                        ? "Newest → Oldest"
-                        : "Oldest → Newest"
-                    }`
-                  : "Sort Oldest → Newest"}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-
-          <div className="col-span-2">File Size</div>
-        </div>
-
-        {/* Rows */}
-        <div className="divide-y divide-gray-100">
-          {sortedItems.map((item: FileItem) => {
-            const creator = getCreatorInfo(item);
-
-            return (
-              <div
-                key={item._id}
-                className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 transition-colors group"
-              >
-                {/* Name column */}
-                <div
-                  className={`col-span-5 flex items-center gap-3 ${
-                    isFolder(item) ? "cursor-pointer" : ""
-                  }`}
-                >
-                  {isFolder(item) ? (
-                    <Link
-                      to={`/dashboard/folder/${item._id}`}
-                      className="flex items-center gap-3 flex-1"
-                    >
+        {/* Table Container */}
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <th
+                    className="text-left px-6 py-3 text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900 group"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center gap-2">
+                      Name
                       <div
-                        className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: item.color || "#64748B" }}
+                        className={`transition-opacity ${
+                          sortField === "name"
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100"
+                        }`}
                       >
-                        <Folder className="w-4 h-4 text-white" />
+                        <SortIcon field="name" />
                       </div>
-                      <span className="text-sm font-medium text-gray-800 truncate">
-                        {item.name}
-                      </span>
-                    </Link>
-                  ) : (
-                    <>
-                      <FileText className="w-6 h-6 text-gray-600 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-800 truncate">
-                        {item.type === "documents" && item.extension
-                          ? `${item.name}.${item.extension}`
-                          : item.name}
-                      </span>
-                    </>
-                  )}
-                </div>
+                    </div>
+                  </th>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {sortField === "name"
+                      ? `Click to sort ${sortOrder === "asc" ? "Z → A" : "A → Z"}`
+                      : "Sort A → Z"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
 
-                {/* Owner column */}
-                <div className="col-span-2 flex items-center gap-2">
-                 
-                 
-                    
-                    {creator.email && (
-                      <span className="text-xs text-gray-500 truncate">
-                        {creator.email}
-                      </span>
-                    )}
-                  
-                </div>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-700 w-64">
+                Owner
+              </th>
 
-                {/* Date column */}
-                <div className="col-span-3 flex items-center text-sm text-gray-600">
-                  {formatDate(item.updatedAt)}
-                </div>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-700 w-48">
+                Date created
+              </th>
 
-                {/* Size and actions column */}
-                <div className="col-span-2 flex items-center justify-between text-sm text-gray-600">
-                  <span>
-                    {isFolder(item) ? "-" : formatFileSize(item.size)}
-                  </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      asChild
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRename(item);
-                        }}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <th
+                    className="text-left px-6 py-3 text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900 group w-48"
+                    onClick={() => handleSort("date")}
+                  >
+                    <div className="flex items-center gap-2">
+                      Date modified
+                      <div
+                        className={`transition-opacity ${
+                          sortField === "date"
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100"
+                        }`}
                       >
-                        <Pencil className="w-4 h-4 mr-2" /> Rename
-                      </DropdownMenuItem>
+                        <SortIcon field="date" />
+                      </div>
+                    </div>
+                  </th>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {sortField === "date"
+                      ? `Click to sort ${
+                          sortOrder === "asc"
+                            ? "Newest → Oldest"
+                            : "Oldest → Newest"
+                        }`
+                      : "Sort Oldest → Newest"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
 
-                      {!isFolder(item) && (
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-700 w-32">
+                File size
+              </th>
+
+              <th className="text-center px-6 py-3 w-12">
+                <MoreVertical className="w-4 h-4 text-gray-500 mx-auto" />
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-gray-100">
+            {sortedItems.map((item: FileItem) => {
+              const creator = getCreatorInfo(item);
+
+              return (
+                <tr
+                  key={item._id}
+                  className="hover:bg-gray-50 transition-colors group"
+                >
+                  {/* Name column */}
+                  <td className="px-6 py-4">
+                    <div
+                      className={`flex items-center gap-3 ${
+                        isFolder(item) ? "cursor-pointer" : ""
+                      }`}
+                    >
+                      {isFolder(item) ? (
+                        <Link
+                          to={`/dashboard/folder/${item._id}`}
+                          className="flex items-center gap-3 flex-1 min-w-0"
+                        >
+                          <div
+                            className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: item.color || "#64748B" }}
+                          >
+                            <Folder className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-800 truncate">
+                            {item.name}
+                          </span>
+                        </Link>
+                      ) : (
                         <>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDownload(item);
-                            }}
-                          >
-                            <Download className="w-4 h-4 mr-2" /> Download
-                          </DropdownMenuItem>
+                          <FileText className="w-6 h-6 text-gray-600 flex-shrink-0" />
+                          <span className="text-sm font-medium text-gray-800 truncate">
+                            {item.type === "documents" && item.extension
+                              ? `${item.name}.${item.extension}`
+                              : item.name}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </td>
 
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onShowInfo(item._id, e);
-                            }}
-                          >
-                            <Eye className="w-4 h-4 mr-2" /> View Details
-                          </DropdownMenuItem>
+                  {/* Owner column */}
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-sm font-medium">
+                          {creator.initials}
+                        </span>
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          {creator.username}
+                        </span>
+                        {creator.email && (
+                          <span className="text-xs text-gray-500 truncate">
+                            {creator.email}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
 
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAddTags(item);
-                            }}
-                          >
-                            <Tag className="w-4 h-4 mr-2" /> Add Tags
-                          </DropdownMenuItem>
+                  {/* Date created column */}
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {formatDate(item.createdAt)}
+                  </td>
 
-                          <DropdownMenuSeparator />
+                  {/* Date modified column */}
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {formatDate(item.updatedAt)}
+                  </td>
 
+                  {/* Size column */}
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {isFolder(item) ? "—" : formatFileSize(item.size)}
+                  </td>
+
+                  {/* Actions column */}
+                  <td className="px-6 py-4">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        asChild
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRename(item);
+                          }}
+                        >
+                          <Pencil className="w-4 h-4 mr-2" /> Rename
+                        </DropdownMenuItem>
+
+                        {!isFolder(item) && (
+                          <>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDownload(item);
+                              }}
+                            >
+                              <Download className="w-4 h-4 mr-2" /> Download
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onShowInfo(item._id, e);
+                              }}
+                            >
+                              <Eye className="w-4 h-4 mr-2" /> View Details
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onAddTags(item);
+                              }}
+                            >
+                              <Tag className="w-4 h-4 mr-2" /> Add Tags
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toast.info("Manage Access feature coming soon");
+                              }}
+                            >
+                              <Users className="w-4 h-4 mr-2" /> Manage Access
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onReupload(item._id);
+                              }}
+                            >
+                              <RefreshCw className="w-4 h-4 mr-2" /> Reupload
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Link
+                                className="flex items-center"
+                                to={`/document/version-history/${item._id}`}
+                              >
+                                <History className="w-4 h-4 mr-2" /> Version
+                                History
+                              </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toast.info("Activity feature coming soon");
+                              }}
+                            >
+                              <Activity className="w-4 h-4 mr-2" /> Activity
+                            </DropdownMenuItem>
+                          </>
+                        )}
+
+                        {isFolder(item) && (
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
@@ -368,67 +439,26 @@ export default function ListView({
                           >
                             <Users className="w-4 h-4 mr-2" /> Manage Access
                           </DropdownMenuItem>
+                        )}
 
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onReupload(item._id);
-                            }}
-                          >
-                            <RefreshCw className="w-4 h-4 mr-2" /> Reupload
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Link
-                              className="flex items-center"
-                              to={`/document/version-history/${item._id}`}
-                            >
-                              <History className="w-4 h-4 mr-2" /> Version
-                              History
-                            </Link>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toast.info("Activity feature coming soon");
-                            }}
-                          >
-                            <Activity className="w-4 h-4 mr-2" /> Activity
-                          </DropdownMenuItem>
-                        </>
-                      )}
-
-                      {isFolder(item) && (
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
+                          className="text-red-600"
                           onClick={(e) => {
                             e.stopPropagation();
-                            toast.info("Manage Access feature coming soon");
+                            onDelete(item);
                           }}
                         >
-                          <Users className="w-4 h-4 mr-2" /> Manage Access
+                          <Trash2 className="w-4 h-4 mr-2" /> Move to Trash
                         </DropdownMenuItem>
-                      )}
-
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-red-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(item);
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" /> Move to Trash
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </TooltipProvider>
     </div>
   );

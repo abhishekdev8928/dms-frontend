@@ -33,8 +33,13 @@ httpClient.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized - logout user
     if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/auth/login';
+      // Check if we're NOT already on the login page
+      const currentPath = window.location.pathname;
+      
+      if (!currentPath.startsWith('/auth/login')) {
+        useAuthStore.getState().logout();
+        window.location.href = '/auth/login';
+      }
     }
     
     // Handle 429 Rate Limit

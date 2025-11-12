@@ -1,9 +1,17 @@
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import React from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface FileItem {
   _id: string;
   name: string;
-  itemType: "file" | "folder";
-  type: "document" | "folder";
+  itemType?: "file" | "folder";
+  type: "documents" | "folder";
   parent_id?: string;
   color?: string;
   isDeleted: boolean;
@@ -21,15 +29,6 @@ interface FileItem {
   tags?: string[];
   extension?: string;
 }
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import React from "react";
-import { useForm } from "react-hook-form";
-import { Form } from "react-router-dom";
-import {z} from "zod"
-import { zodResolver } from "@hookform/resolvers/zod";
 
 const addTagsSchema = z.object({
   tags: z.string().min(1, "Please enter at least one tag"),

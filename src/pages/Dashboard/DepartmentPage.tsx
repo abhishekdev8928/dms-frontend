@@ -83,7 +83,7 @@ const DepartmentManagement = () => {
     resolver: zodResolver(createDepartmentSchema),
     defaultValues: {
       name: '',
-      description: ''
+    
     }
   });
 
@@ -91,8 +91,7 @@ const DepartmentManagement = () => {
   const updateForm = useForm<z.infer<typeof updateDepartmentSchema>>({
     resolver: zodResolver(updateDepartmentSchema),
     defaultValues: {
-      name: '',
-      description: ''
+      name: ''
     }
   });
 
@@ -182,7 +181,6 @@ const DepartmentManagement = () => {
     setSelectedDepartment(dept);
     updateForm.reset({
       name: dept.name,
-      description: dept.description || ''
     });
 
     setShowModal(true);
@@ -481,19 +479,7 @@ const DepartmentManagement = () => {
                   )}
                 />
                 
-                <FormField
-                  control={createForm.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter description (optional)" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+               
 
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
@@ -524,20 +510,7 @@ const DepartmentManagement = () => {
                   )}
                 />
                 
-                <FormField
-                  control={updateForm.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter description (optional)" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
+               
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
                     Cancel
