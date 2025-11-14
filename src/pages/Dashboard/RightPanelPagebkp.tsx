@@ -7,15 +7,14 @@ import {
   List,
   Grid3x3,
   Info,
+  Upload,
   ChevronRight,
   FolderPlus,
   ChevronDown,
   ChevronUp,
+  FileText,
+  FolderUp,
 } from "lucide-react";
-
-import { Edit, Download, Share2, Trash2 } from "lucide-react";
-
-import EmptyState from "@/components/custom/EmptyState";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb as BreadcrumbComponent,
@@ -88,11 +87,10 @@ export default function RightPanelView() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
-  const [reuploadDocumentId, setReuploadDocumentId] = useState<string | null>(
-    null
-  );
+  const [reuploadDocumentId, setReuploadDocumentId] = useState<string | null>(null);
   const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<FileItem | null>(null);
+
 
   // Modal states
   const [renameModalOpen, setRenameModalOpen] = useState(false);
@@ -106,11 +104,7 @@ export default function RightPanelView() {
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   // Queries
-  const {
-    data: childrenData,
-    isLoading,
-    error,
-  } = useQuery({
+  const { data: childrenData, isLoading, error } = useQuery({
     queryKey: ["children", parentId, selectedTypeFilter, selectedUser],
     queryFn: async () => {
       const res = await getChildFolders(parentId || "", {
@@ -133,16 +127,9 @@ export default function RightPanelView() {
     queryFn: getAllUsers,
   });
 
-  // Data
-  const items: FileItem[] = childrenData?.children || [];
-  const breadcrumbs: Breadcrumb[] = Array.isArray(breadcrumbsData)
-    ? breadcrumbsData
-    : breadcrumbsData?.data || [];
-  const isEmpty = items.length === 0;
-
-  // Mutations - Pass breadcrumbs to the hook
+  // Mutations
   const { createFolderMutation, updateFolderMutation, deleteFolderMutation } =
-    useFolderMutations(parentId, breadcrumbs);
+    useFolderMutations(parentId);
 
   const {
     reuploadMutation,
@@ -155,6 +142,13 @@ export default function RightPanelView() {
     reuploadDocumentId,
     setReuploadDocumentId
   );
+
+  // Data
+  const items: FileItem[] = childrenData?.children || [];
+  const breadcrumbs: Breadcrumb[] = Array.isArray(breadcrumbsData)
+    ? breadcrumbsData
+    : breadcrumbsData?.data || [];
+  const isEmpty = items.length === 0;
 
   // Event Handlers
   const handleFileUpload = async (files: FileList | null) => {
@@ -176,20 +170,25 @@ export default function RightPanelView() {
       return;
     }
 
+    const loadingToast = toast.loading(
+      `Uploading ${validFiles.length} file(s)...`,
+      { description: getFormattedDateTime() }
+    );
+
     try {
       await uploadFiles(validFiles, {
         parentId,
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["children", parentId] });
           queryClient.invalidateQueries({ queryKey: ["tree"] });
-
+          toast.dismiss(loadingToast);
           toast.success(`${validFiles.length} file(s) uploaded successfully`, {
             description: getFormattedDateTime(),
           });
         },
         onError: (error) => {
           console.error("Upload error:", error);
-
+          toast.dismiss(loadingToast);
           toast.error("Upload failed", {
             description: error?.message || getFormattedDateTime(),
           });
@@ -197,7 +196,7 @@ export default function RightPanelView() {
       });
     } catch (error: any) {
       console.error("Upload failed:", error);
-
+      toast.dismiss(loadingToast);
       toast.error("Upload failed", {
         description: error?.message || getFormattedDateTime(),
       });
@@ -223,18 +222,20 @@ export default function RightPanelView() {
       return;
     }
 
+    const loadingToast = toast.loading("Uploading folder...", {
+      description: getFormattedDateTime(),
+    });
+
     try {
       await uploadFolder(validFiles, {
         parentId,
         onProgress: (progress) => {
-          console.log(
-            `${progress.stage}: ${progress.current}/${progress.total}`
-          );
+          console.log(`${progress.stage}: ${progress.current}/${progress.total}`);
         },
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["children", parentId] });
           queryClient.invalidateQueries({ queryKey: ["tree"] });
-
+          toast.dismiss(loadingToast);
           toast.success("Folder uploaded successfully", {
             description: getFormattedDateTime(),
           });
@@ -242,7 +243,7 @@ export default function RightPanelView() {
       });
     } catch (error: any) {
       console.error("Folder upload failed:", error);
-
+      toast.dismiss(loadingToast);
       toast.error("Folder upload failed", {
         description: error?.message || getFormattedDateTime(),
       });
@@ -420,56 +421,18 @@ export default function RightPanelView() {
 
                             <DropdownMenuItem
                               className="py-2 cursor-pointer"
-                              onClick={() => {
-                                if (breadcrumbs.length > 0) {
-                                  const currentCrumb = breadcrumbs[breadcrumbs.length - 1];
-                                  handleRename({
-                                    _id: currentCrumb._id,
-                                    name: currentCrumb.name,
-                                    type: 'folder',
-                                  } as FileItem);
-                                  setActionsDropdownOpen(false);
-                                }
-                              }}
+                              onClick={handleFileUploadClick}
                             >
-                              <Edit className="w-4 h-4 mr-2 text-gray-600" />
-                              <span className="text-sm">Rename Folder</span>
+                              <FileText className="w-4 h-4 mr-2 text-gray-600" />
+                              <span className="text-sm">Upload Files</span>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
-                              className="py-2 cursor-pointer opacity-50 cursor-not-allowed"
-                              disabled
+                              className="py-2 cursor-pointer"
+                              onClick={handleFolderUploadClick}
                             >
-                              <Download className="w-4 h-4 mr-2 text-gray-400" />
-                              <span className="text-sm text-gray-400">Download (Coming Soon)</span>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              className="py-2 cursor-pointer opacity-50 cursor-not-allowed"
-                              disabled
-                            >
-                              <Share2 className="w-4 h-4 mr-2 text-gray-400" />
-                              <span className="text-sm text-gray-400">Share (Coming Soon)</span>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator />
-
-                            <DropdownMenuItem
-                              className="py-2 cursor-pointer text-red-600 hover:text-red-700 focus:text-red-700"
-                              onClick={() => {
-                                if (breadcrumbs.length > 0) {
-                                  const currentCrumb = breadcrumbs[breadcrumbs.length - 1];
-                                  handleDelete({
-                                    _id: currentCrumb._id,
-                                    name: currentCrumb.name,
-                                    type: 'folder',
-                                  } as FileItem);
-                                  setActionsDropdownOpen(false);
-                                }
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              <span className="text-sm">Move to Trash</span>
+                              <FolderUp className="w-4 h-4 mr-2 text-gray-600" />
+                              <span className="text-sm">Upload Folder</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -659,60 +622,43 @@ export default function RightPanelView() {
       <CreateFolderModal
         open={createFolderModalOpen}
         onOpenChange={setCreateFolderModalOpen}
-        onConfirm={async (data) => {
-          try {
-            await createFolderMutation.mutateAsync({
-              ...data,
-              parent_id: parentId || "",
-            });
-            setCreateFolderModalOpen(false);
-          } catch (error) {
-            console.error("Failed to create folder:", error);
-          }
-        }}
+        onConfirm={(data) =>
+          createFolderMutation.mutate({ ...data, parent_id: parentId || "" })
+        }
         isLoading={createFolderMutation.isPending}
-      />
-
-      <RenameDocumentModal
-        open={renameModalOpen && !isFolder(selectedItem)}
-        onOpenChange={setRenameModalOpen}
-        item={selectedItem}
-        onConfirm={async (data) => {
-          if (selectedItem) {
-            try {
-              await updateDocumentMutation.mutateAsync({
-                id: selectedItem._id,
-                name: data.name,
-                description: data.description,
-              });
-              setRenameModalOpen(false);
-            } catch (error) {
-              console.error("Failed to rename document:", error);
-            }
-          }
-        }}
-        isLoading={updateDocumentMutation.isPending}
       />
 
       <RenameFolderModal
         open={renameModalOpen && isFolder(selectedItem)}
         onOpenChange={setRenameModalOpen}
         item={selectedItem}
-        onConfirm={async (data) => {
+        onConfirm={(data) => {
           if (selectedItem) {
-            try {
-              await updateFolderMutation.mutateAsync({
-                id: selectedItem._id,
-                name: data.name,
-                color: data.color,
-              });
-              setRenameModalOpen(false);
-            } catch (error) {
-              console.error("Failed to rename folder:", error);
-            }
+            updateFolderMutation.mutate({
+              id: selectedItem._id,
+              name: data.name,
+              color: data.color,
+            });
+            setRenameModalOpen(false);
           }
         }}
         isLoading={updateFolderMutation.isPending}
+      />
+
+      <RenameDocumentModal
+        open={renameModalOpen && !isFolder(selectedItem)}
+        onOpenChange={setRenameModalOpen}
+        item={selectedItem}
+        onConfirm={(data) => {
+          if (selectedItem) {
+            updateDocumentMutation.mutate({
+              id: selectedItem._id,
+              name: data.name,
+              description: data.description,
+            });
+          }
+        }}
+        isLoading={updateDocumentMutation.isPending}
       />
 
       <DeleteModal
@@ -738,18 +684,65 @@ export default function RightPanelView() {
         open={tagsModalOpen}
         onOpenChange={setTagsModalOpen}
         item={selectedItem}
-        onConfirm={async (tags) => {
+        onConfirm={(tags) => {
           if (selectedItem) {
-            try {
-              await addTagsMutation.mutateAsync({ id: selectedItem._id, tags });
-              setTagsModalOpen(false);
-            } catch (error) {
-              console.error("Failed to add tags:", error);
-            }
+            addTagsMutation.mutate({ id: selectedItem._id, tags });
+            setTagsModalOpen(false);
           }
         }}
         isLoading={addTagsMutation.isPending}
       />
+    </div>
+  );
+}
+
+// EmptyState Component
+function EmptyState({
+  onUpload,
+  dragActive,
+  onCreateFolder,
+}: {
+  onUpload: () => void;
+  dragActive: boolean;
+  onCreateFolder: () => void;
+}) {
+  return (
+    <div
+      className="flex items-center justify-center h-full cursor-pointer hover:bg-gray-50 transition-colors"
+      onClick={onUpload}
+    >
+      <div
+        className={`text-center transition-all ${
+          dragActive ? "scale-105" : ""
+        }`}
+      >
+        <div className="mb-8">
+          <div className="w-48 h-48 mx-auto mb-4 flex items-center justify-center">
+            <Upload className="w-32 h-32 text-gray-400" />
+          </div>
+        </div>
+
+        <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+          {dragActive ? "Drop files here" : "Click anywhere to upload"}
+        </h2>
+        <p className="text-gray-600 mb-6">or drag and drop files</p>
+
+        <Button
+          variant="outline"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCreateFolder();
+          }}
+          className="mb-4"
+        >
+          <FolderPlus className="w-4 h-4 mr-2" />
+          Create Folder
+        </Button>
+
+        <p className="text-sm text-gray-500 mt-4">
+          Supported: PDF, DOCX, XLSX, JPG, PNG, ZIP (max 4GB)
+        </p>
+      </div>
     </div>
   );
 }

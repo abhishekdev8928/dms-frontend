@@ -25,3 +25,10 @@ export const getFilterTypes = async (params: { query?: string }) => {
   const res = await httpClient.get("/search/filter-types", { params });
   return res.data;
 };
+
+
+
+export const getAllUsers = async ()=>{
+  const res = await httpClient.get("/search/users");
+  return res.data;
+}

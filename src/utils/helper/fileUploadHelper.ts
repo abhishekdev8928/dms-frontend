@@ -1,6 +1,7 @@
 import axios from "axios";
 import { generatePresignedUrls, createDocument } from "@/config/api/documentApi";
 import { useUploadStore } from "@/config/store/uploadStore";
+import { queryClient } from "@/main";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -9,6 +10,7 @@ export interface FileUploadOptions {
   parentId: string;
   onSuccess?: (count: number) => void;
   onError?: (error: any) => void;
+  onFileUploaded?: (fileIndex: number, totalFiles: number) => void; // NEW: Callback for each file
 }
 
 export interface FileUploadResult {
@@ -37,7 +39,7 @@ export const uploadFiles = async (
   files: File[],
   options: FileUploadOptions
 ): Promise<FileUploadResult> => {
-  const { parentId, onSuccess, onError } = options;
+  const { parentId, onSuccess, onError, onFileUploaded } = options;
 
   if (!files || files.length === 0) {
     throw new Error("No files provided");
@@ -47,8 +49,7 @@ export const uploadFiles = async (
     throw new Error("Parent ID is required");
   }
 
- const { addUpload, updateProgress, setStatus } = useUploadStore.getState();
-
+  const { addUpload, updateProgress, setStatus } = useUploadStore.getState();
 
   try {
     // Step 1: Generate presigned URLs
@@ -63,6 +64,8 @@ export const uploadFiles = async (
     if (!Array.isArray(presignedFiles)) {
       throw new Error("Invalid presigned URL response");
     }
+
+    let successfulUploads = 0;
 
     // Step 2: Upload files to S3 and save metadata
     const uploadPromises = presignedFiles.map(async (item: any, index: number) => {
@@ -115,11 +118,15 @@ export const uploadFiles = async (
 
         // Mark as completed
         setStatus(uploadId, 'Upload Complete');
+        successfulUploads++;
 
-        // Auto-remove after 3 seconds
-        // setTimeout(() => {
-        //   removeUpload(uploadId);
-        // }, 3000);
+        // ✅ IMMEDIATELY INVALIDATE QUERIES AFTER EACH FILE
+        queryClient.invalidateQueries({ queryKey: ["children", parentId] });
+        queryClient.invalidateQueries({ queryKey: ["tree"] });
+        queryClient.invalidateQueries({ queryKey: ["documents"] });
+
+        // ✅ Call the callback to notify about this file completion
+        onFileUploaded?.(successfulUploads, files.length);
 
       } catch (error: any) {
         if (axios.isCancel(error) || error.name === 'CanceledError') {
@@ -133,6 +140,7 @@ export const uploadFiles = async (
 
     await Promise.all(uploadPromises);
 
+    // Final success callback
     onSuccess?.(files.length);
 
     return {
@@ -170,7 +178,6 @@ export const ALLOWED_MIME_TYPES = [
 
 export const MAX_FILE_SIZE = 4 * 1024 * 1024 * 1024; // 4 GB
 
-// REPLACE the existing validateFile function with this improved version:
 export const validateFile = (
   file: File
 ): { valid: boolean; error?: string } => {
@@ -204,7 +211,6 @@ export const validateFile = (
   return { valid: true };
 };
 
-// Keep validateFiles as is - it's fine
 export const validateFiles = (
   files: File[]
 ): { validFiles: File[]; errors: string[] } => {

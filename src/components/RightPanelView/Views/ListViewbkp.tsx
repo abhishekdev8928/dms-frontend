@@ -86,12 +86,7 @@ export default function ListView({
   };
 
   const getSortedItems = (): FileItem[] => {
-    // First separate folders and files
-    const folders = items.filter(item => item.type === "folder");
-    const files = items.filter(item => item.type !== "folder");
-
-    // Sort folders
-    const sortedFolders = [...folders].sort((a, b) => {
+    const sorted = [...items].sort((a, b) => {
       if (sortField === "name") {
         const nameA = a.name.toLowerCase();
         const nameB = b.name.toLowerCase();
@@ -104,24 +99,7 @@ export default function ListView({
         return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
       }
     });
-
-    // Sort files
-    const sortedFiles = [...files].sort((a, b) => {
-      if (sortField === "name") {
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
-        return sortOrder === "asc"
-          ? nameA.localeCompare(nameB)
-          : nameB.localeCompare(nameA);
-      } else {
-        const dateA = new Date(a.updatedAt).getTime();
-        const dateB = new Date(b.updatedAt).getTime();
-        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
-      }
-    });
-
-    // Return folders first, then files
-    return [...sortedFolders, ...sortedFiles];
+    return sorted;
   };
 
   const SortIcon = ({ field }: { field: SortField }) => {

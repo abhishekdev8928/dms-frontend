@@ -59,19 +59,30 @@ export const getFolderById = async (id: string) => {
 };
 
 /**
- * Get child folders (direct children only)
+ * Get child folders (direct children only, or nested with filters)
  * Route: GET /api/folders/:id/children
  * Access: Private
  */
 export const getChildFolders = async (
   id: string,
-  params?: { includeDeleted?: boolean; type?: string }
+  params?: { includeDeleted?: boolean; type?: string; userEmail?: string }
 ) => {
+  console.log('🚀 API Called with:', { id, params });
+  
   const validatedId = folderIdSchema.parse({ id });
-  const validatedParams = getChildFoldersSchema.parse(params || {});
+  
+  const cleanParams = Object.fromEntries(
+    Object.entries(params || {}).filter(([_, value]) => value !== undefined)
+  );
+  
+  
+  const validatedParams = getChildFoldersSchema.parse(cleanParams);
+  
+  
   const res = await httpClient.get(`/folders/${validatedId.id}/children`, {
     params: validatedParams,
   });
+  
   return res.data;
 };
 

@@ -52,10 +52,7 @@ import {
   createDepartmentSchema, 
   type CreateDepartmentInput 
 } from "@/utils/validations/departmentValidation";
-import { 
-  createFolderSchema, 
-  type CreateFolderInput 
-} from "@/utils/validations/folderValidation";
+import CreateFolderModal from "@/components/RightPanelView/Modals/CreateFolderModal";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -89,15 +86,6 @@ export const LeftPanelView = () => {
     },
   });
 
-  const folderForm = useForm<CreateFolderInput>({
-    resolver: zodResolver(createFolderSchema),
-    defaultValues: {
-      name: "",
-      parent_id: parentId || "",
-      color: "#3B82F6",
-    },
-  });
-
   // ============================================================================
   // QUERIES
   // ============================================================================
@@ -112,10 +100,6 @@ export const LeftPanelView = () => {
   });
 
   const treeData: TreeNode[] = treeResponse?.data || [];
-
-  
-
-  
 
   // ============================================================================
   // MUTATIONS
@@ -142,14 +126,13 @@ export const LeftPanelView = () => {
   const createFolderMutation = useMutation({
     mutationFn: createFolder,
     onSuccess: (data) => {
-      toast.success("Folder Created", {
-        description: `"${data.data.name}" has been created successfully.`,
+      toast.success("Redirecting you inside the folder", {
+        description: "Folder created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["tree"] });
       queryClient.invalidateQueries({ queryKey: ["children", parentId] });
       queryClient.invalidateQueries({ queryKey: ["breadcrumbs", parentId] });
-      folderForm.reset();
-      setIsFolderModalOpen(false);
+      navigate(`/dashboard/folder/${data.data._id}`);
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.message || "Failed to create folder";
@@ -304,16 +287,6 @@ export const LeftPanelView = () => {
     createDeptMutation.mutate(data);
   };
 
-  const onSubmitFolder = (data: CreateFolderInput) => {
-    if (!parentId) {
-      toast.error("No Parent Folder", {
-        description: "Please select a parent folder first.",
-      });
-      return;
-    }
-    createFolderMutation.mutate({ ...data, parent_id: parentId });
-  };
-
   // ============================================================================
   // MODAL HANDLERS
   // ============================================================================
@@ -324,13 +297,11 @@ export const LeftPanelView = () => {
       });
       return;
     }
-    folderForm.setValue("parent_id", parentId);
     setIsFolderModalOpen(true);
   };
 
   const handleCancelModal = () => {
     departmentForm.reset();
-    folderForm.reset();
     setIsDeptModalOpen(false);
     setIsFolderModalOpen(false);
   };
@@ -643,62 +614,22 @@ export const LeftPanelView = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Folder Modal */}
-      <Dialog open={isFolderModalOpen} onOpenChange={setIsFolderModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Create New Folder</DialogTitle>
-          </DialogHeader>
-
-          <Form {...folderForm}>
-            <form onSubmit={folderForm.handleSubmit(onSubmitFolder)} className="space-y-4">
-              <FormField
-                control={folderForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Folder Name *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter folder name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={folderForm.control}
-                name="color"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Color (Optional)</FormLabel>
-                    <FormControl>
-                      <Input type="color" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button type="button" variant="ghost" onClick={handleCancelModal}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createFolderMutation.isPending}>
-                  {createFolderMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create Folder"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      {/* Folder Modal - Using Shared Component */}
+      <CreateFolderModal
+        open={isFolderModalOpen}
+        onOpenChange={setIsFolderModalOpen}
+        onConfirm={(data) => {
+          createFolderMutation.mutate(
+            { ...data, parent_id: parentId || "" },
+            {
+              onSuccess: () => {
+                setIsFolderModalOpen(false);
+              },
+            }
+          );
+        }}
+        isLoading={createFolderMutation.isPending}
+      />
     </>
   );
 };

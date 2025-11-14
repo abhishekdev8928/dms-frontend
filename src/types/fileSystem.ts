@@ -1,15 +1,16 @@
-// src/types/fileSystem.ts
-
 export interface FileItem {
   _id: string;
   name: string;
-  itemType: 'file' | 'folder';
-  type: 'document' | 'folder';
+  type: string; // Can be "folder", "image", "pdf", "video", etc.
   parent_id?: string;
   color?: string;
   isDeleted: boolean;
   deletedAt: string | null;
-  createdBy: string;
+  createdBy: {
+    _id: string;
+    email: string;
+    username: string;
+  };
   createdAt: string;
   updatedAt: string;
   path: string;
@@ -28,22 +29,4 @@ export interface Breadcrumb {
   name: string;
   type: string;
   path: string;
-}
-
-export interface MutationProps {
-  mutate: (data: any) => void;
-}
-
-export interface FileOperationProps {
-  parentId: string;
-  items: FileItem[];
-  updateFolderMutation: MutationProps;
-  deleteFolderMutation: MutationProps;
-  updateDocumentMutation: MutationProps;
-  deleteDocumentMutation: MutationProps;
-  addTagsMutation: MutationProps;
-  onDownload: (item: FileItem) => void;
-  onShowInfo: (fileId: string, e?: React.MouseEvent) => void;
-  onReupload: (documentId: string) => void;
-  navigate: (path: string) => void;
 }

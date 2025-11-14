@@ -11,6 +11,8 @@ import {
   X,
   FileText,
 } from "lucide-react";
+import { getFileIcon } from "@/constants/getIcons";
+
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -43,11 +45,15 @@ interface VersionInfo {
     _id: string;
     name: string;
     originalName: string;
+    extension:string;
   };
+  name:string,
   versionNumber: number;
+  extension:string;
   fileUrl: string;
   size: number;
   mimeType: string;
+  type:string,
   changeDescription: string;
   pathAtCreation: string;
   createdBy: {
@@ -210,6 +216,8 @@ export default function GoogleDriveVersionHistory() {
   // Get document info from first version (all versions have same document)
   const document = currentVersion?.documentId;
 
+  console.log(document);
+
   return (
     <div className="h-screen bg-white flex flex-col">
       {/* Header - Fixed */}
@@ -228,7 +236,7 @@ export default function GoogleDriveVersionHistory() {
               <div>
                 <h1 className="text-base font-normal text-gray-700">Version history:</h1>
                 <h2 className="text-xl font-normal text-gray-900 mt-0.5">
-                  {document?.name || "Unknown Document"}
+                  {document?.name + "." + document?.extension}
                 </h2>
               </div>
             </div>
@@ -270,13 +278,18 @@ export default function GoogleDriveVersionHistory() {
                   <div className="flex items-center gap-4">
                     {/* File Icon */}
                     <div className="flex-shrink-0 w-10 flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-gray-400" />
+                     {(() => {
+  const { icon: Icon, color } = getFileIcon(currentVersion.type );
+  return <Icon className="w-6 h-6" style={{ color }} />;
+})()}
+
+
                     </div>
                     
                     {/* File Info */}
                     <div className="flex-1 min-w-0" style={{ minWidth: '250px' }}>
                       <p className="text-sm text-gray-900 truncate mb-1">
-                        {currentVersion.documentId.name}
+                        {currentVersion.name + "." +currentVersion.extension}
                       </p>
                       <p className="text-xs text-gray-500">
                         {formatDateTime(currentVersion.createdAt)}
@@ -318,13 +331,16 @@ export default function GoogleDriveVersionHistory() {
                   <div className="flex items-center gap-4">
                     {/* File Icon */}
                     <div className="flex-shrink-0 w-10 flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-gray-400" />
+                        {(() => {
+  const { icon: Icon, color } = getFileIcon(version.type );
+  return <Icon className="w-6 h-6" style={{ color }} />;
+})()}
                     </div>
                     
                     {/* File Info */}
                     <div className="flex-1 min-w-0" style={{ minWidth: '250px' }}>
                       <p className="text-sm text-gray-900 truncate mb-1">
-                        {version.documentId.name}
+                        {version.name + "." + version.extension}
                       </p>
                       <p className="text-xs text-gray-500">
                         {formatDateTime(version.createdAt)}

@@ -1,19 +1,13 @@
 import { z } from "zod";
 
 // ✅ Sort order validator
-const sortOrderValidator = z
-  .enum(["asc", "desc"])
-  .default("desc");
+const sortOrderValidator = z.enum(["asc", "desc"]).default("desc");
 
 // ✅ Item type validator
-const itemTypeValidator = z
-  .enum(["all", "folder", "document"])
-  .default("all");
+const itemTypeValidator = z.enum(["all", "folder", "document"]).default("all");
 
 // ✅ Deleted by validator
-const deletedByValidator = z
-  .enum(["anyone", "me"])
-  .default("anyone");
+const deletedByValidator = z.enum(["anyone", "me"]).default("anyone");
 
 // ✅ Date deleted validator
 const dateDeletedValidator = z

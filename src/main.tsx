@@ -14,23 +14,21 @@ export const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-
-     <QueryClientProvider client={queryClient} >
-      {/* <ReactQueryDevtools initialIsOpen={false} /> */}
-
+    <QueryClientProvider client={queryClient}>
       <GlobalUploadProgress />
+     
       <Toaster
-      position="top-right"   
-      richColors
-      expand
-      toastOptions={{
-        style: {
-          borderRadius: '10px',
-          padding: '10px 16px',
-        },
-      }}
-    />
-    <RouterProvider router={router} />
+        position="top-right"   
+        richColors
+        expand
+        toastOptions={{
+          style: {
+            borderRadius: '10px',
+            padding: '10px 16px',
+          },
+        }}
+      />
+      <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>
 )

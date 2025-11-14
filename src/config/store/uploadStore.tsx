@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useEffect } from 'react';
 
 export interface UploadingFile {
   id: string;
@@ -35,6 +36,7 @@ interface UploadStore {
   setOpen: (isOpen: boolean) => void;
   setExpanded: (isExpanded: boolean) => void;
   toggleExpanded: () => void;
+  hasActiveUploads: () => boolean;
 }
 
 export const useUploadStore = create<UploadStore>((set, get) => ({
@@ -62,7 +64,6 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
 
   // ⚙️ Update status or error message
   setStatus: (id, status, errorMessage) => {
-    
     set((state) => ({
       uploads: state.uploads.map((upload) =>
         upload.id === id ? { ...upload, status, errorMessage } : upload
@@ -83,7 +84,6 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
     if (upload?.cancelToken) {
       upload.cancelToken.abort();
     }
-    // ✅ Use consistent status label
     get().setStatus(id, 'Upload Cancelled');
   },
 
@@ -104,4 +104,39 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
   setExpanded: (isExpanded) => set({ isExpanded }),
   toggleExpanded: () =>
     set((state) => ({ isExpanded: !state.isExpanded })),
+
+  // ✅ Check if there are any active uploads
+  hasActiveUploads: () => {
+    const { uploads } = get();
+    return uploads.some(
+      (upload) =>
+        upload.status === 'Pending Upload' ||
+        upload.status === 'Uploading File' ||
+        upload.status === 'Processing File'
+    );
+  },
 }));
+
+// 🛡️ Custom hook to prevent page refresh/close during uploads
+export const useUploadWarning = () => {
+  const hasActiveUploads = useUploadStore((state) => state.hasActiveUploads);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasActiveUploads()) {
+        // Standard way to trigger browser warning
+        e.preventDefault();
+        // Chrome requires returnValue to be set
+        e.returnValue = '';
+        // Some browsers show this message (most show their own)
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasActiveUploads]);
+};

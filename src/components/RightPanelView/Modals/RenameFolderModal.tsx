@@ -1,14 +1,28 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import React from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { Form } from "@/components/ui/form";
-import {z} from "zod"
+import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { FileItem } from "@/types/fileSystem";
 
-// Validation schemas
+// Validation schema
 const renameFolderSchema = z.object({
   name: z
     .string()
@@ -21,62 +35,46 @@ const renameFolderSchema = z.object({
     .optional(),
 });
 
-interface FileItem {
-  _id: string;
-  name: string;
-  itemType: "file" | "folder";
-  type: "document" | "folder";
-  parent_id?: string;
-  color?: string;
-  isDeleted: boolean;
-  deletedAt: string | null;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-  path: string;
-  fileUrl?: string;
-  originalName?: string;
-  mimeType?: string;
-  size?: number;
-  hasChildren?: boolean;
-  description?: string;
-  tags?: string[];
-  extension?: string;
+type RenameFolderFormData = z.infer<typeof renameFolderSchema>;
+
+interface RenameFolderModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  item: FileItem | null;
+  onConfirm: (data: { name: string; color?: string }) => void;
+  isLoading?: boolean;
 }
+
 export default function RenameFolderModal({
   open,
   onOpenChange,
   item,
   onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  item: FileItem | null;
-  onConfirm: (data: { name: string; color?: string }) => void;
-}) {
-  const form = useForm<z.infer<typeof renameFolderSchema>>({
+  isLoading = false,
+}: RenameFolderModalProps) {
+  const form = useForm<RenameFolderFormData>({
     resolver: zodResolver(renameFolderSchema),
     defaultValues: {
-      name: item?.name || "",
-      color: item?.color || "#3B82F6",
+      name: "",
+      color: "#3B82F6",
     },
   });
 
-  React.useEffect(() => {
-    if (item) {
+  // Reset form when item changes or modal opens
+  useEffect(() => {
+    if (item && open) {
       form.reset({
         name: item.name,
         color: item.color || "#3B82F6",
       });
     }
-  }, [item, form]);
+  }, [item, open, form]);
 
-  const handleSubmit = (data: z.infer<typeof renameFolderSchema>) => {
+  const handleSubmit = (data: RenameFolderFormData) => {
     onConfirm(data);
-    onOpenChange(false);
+    // Don't close modal here - let parent handle it after mutation succeeds
   };
 
- 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -98,7 +96,11 @@ export default function RenameFolderModal({
                 <FormItem>
                   <FormLabel>Folder Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter folder name" {...field} />
+                    <Input
+                      placeholder="Enter folder name"
+                      {...field}
+                      disabled={isLoading}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -112,7 +114,17 @@ export default function RenameFolderModal({
                 <FormItem>
                   <FormLabel>Color</FormLabel>
                   <FormControl>
-                    <Input type="color" {...field} />
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="color"
+                        {...field}
+                        className="w-20 h-10 cursor-pointer"
+                        disabled={isLoading}
+                      />
+                      <span className="text-sm text-gray-600">
+                        {field.value}
+                      </span>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -124,11 +136,16 @@ export default function RenameFolderModal({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={isLoading}
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-teal-500 hover:bg-teal-600">
-                Create Folder
+              <Button
+                type="submit"
+                className="bg-teal-500 hover:bg-teal-600"
+                disabled={isLoading}
+              >
+                {isLoading ? "Updating..." : "Update Folder"}
               </Button>
             </DialogFooter>
           </form>

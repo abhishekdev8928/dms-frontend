@@ -4,8 +4,10 @@ import TopHeader from "../custom/TopHeader";
 
 import { LeftPanelView } from "../tree/LeftPanelView";
 import { useIsAuthenticated } from "@/config/store/authStore";
+import { useUploadWarning } from '@/config/store/uploadStore';
 
 const DashboardLayout = () => {
+  useUploadWarning(); // Add this line
 
   const isAuthenticated = useIsAuthenticated();
 
@@ -14,6 +16,9 @@ const DashboardLayout = () => {
     return <Navigate to="/auth/login" replace />;
   }
   
+
+ 
+
   
 
   return (

@@ -1,126 +1,141 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import React from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
+import { useState, useEffect } from "react";
+import type { FileItem } from "@/types/fileSystem";
 
-interface FileItem {
-  _id: string;
-  name: string;
-  itemType?: "file" | "folder";
-  type: "documents" | "folder";
-  parent_id?: string;
-  color?: string;
-  isDeleted: boolean;
-  deletedAt: string | null;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-  path: string;
-  fileUrl?: string;
-  originalName?: string;
-  mimeType?: string;
-  size?: number;
-  hasChildren?: boolean;
-  description?: string;
-  tags?: string[];
-  extension?: string;
+interface TagsModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  item: FileItem | null;
+  onConfirm: (tags: string[]) => void;
+  isLoading?: boolean;
 }
-
-const addTagsSchema = z.object({
-  tags: z.string().min(1, "Please enter at least one tag"),
-});
 
 export default function TagsModal({
   open,
   onOpenChange,
   item,
   onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  item: FileItem | null;
-  onConfirm: (tags: string[]) => void;
-}) {
-  const form = useForm<z.infer<typeof addTagsSchema>>({
-    resolver: zodResolver(addTagsSchema),
-    defaultValues: {
-      tags: item?.tags?.join(", ") || "",
-    },
-  });
+  isLoading = false,
+}: TagsModalProps) {
+  const [tags, setTags] = useState<string[]>([]);
+  const [inputValue, setInputValue] = useState("");
 
-  React.useEffect(() => {
-    if (item) {
-      form.reset({
-        tags: item.tags?.join(", ") || "",
-      });
+  useEffect(() => {
+    if (item && open) {
+      setTags(item.tags || []);
+      setInputValue("");
     }
-  }, [item, form]);
+  }, [item, open]);
 
-  const handleSubmit = (data: z.infer<typeof addTagsSchema>) => {
-    const tagsArray = data.tags
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-    onConfirm(tagsArray);
-    onOpenChange(false);
+  const handleAddTag = () => {
+    const trimmedValue = inputValue.trim();
+    if (trimmedValue && !tags.includes(trimmedValue)) {
+      setTags([...tags, trimmedValue]);
+      setInputValue("");
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddTag();
+    }
+  };
+
+  const handleConfirm = () => {
+    onConfirm(tags);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Tags</DialogTitle>
+          <DialogTitle>Manage Tags</DialogTitle>
           <DialogDescription>
-            Add or update tags for "{item?.name}". Separate multiple tags with
-            commas.
+            Add or remove tags for "{item?.name}"
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-4"
-          >
-            <FormField
-              control={form.control}
-              name="tags"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tags</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g., important, project, Q1"
-                      {...field}
-                    />
-                  </FormControl>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Current tags:{" "}
-                    {item?.tags && item.tags.length > 0
-                      ? item.tags.join(", ")
-                      : "None"}
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="bg-teal-500 hover:bg-teal-600">
-                Save Tags
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        <div className="space-y-4">
+          {/* Input for adding tags */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter tag name..."
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+            />
+            <Button
+              type="button"
+              onClick={handleAddTag}
+              disabled={!inputValue.trim() || isLoading}
+            >
+              Add
+            </Button>
+          </div>
+
+          {/* Display current tags */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="secondary"
+                  className="flex items-center gap-1 px-3 py-1"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(tag)}
+                    className="ml-1 hover:text-red-600"
+                    disabled={isLoading}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {tags.length === 0 && (
+            <p className="text-sm text-gray-500 text-center py-4">
+              No tags added yet
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            className="bg-teal-500 hover:bg-teal-600"
+            disabled={isLoading}
+          >
+            {isLoading ? "Saving..." : "Save Tags"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

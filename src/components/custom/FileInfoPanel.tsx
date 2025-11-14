@@ -3,6 +3,7 @@ import { X, Users, Clock, FileText, HardDrive, User, Calendar, Image as ImageIco
 
 import { Button } from '@/components/ui/button';
 import { getDocumentById } from '@/config/api/documentApi';
+import { Link } from 'react-router-dom';
 
 interface FileInfoPanelProps {
   fileId: string | null;
@@ -41,7 +42,7 @@ export default function FileInfoPanel({ fileId, onClose }: FileInfoPanelProps) {
     return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const getDimensions = () => {
+  const getDimensions = (mimeType?: string) => {
     // This would need to be stored in your document metadata
     // For now returning placeholder
     return document?.dimensions || '-';
@@ -85,12 +86,8 @@ export default function FileInfoPanel({ fileId, onClose }: FileInfoPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <div className="flex items-center gap-2">
-          <button className="p-1 hover:bg-gray-100 rounded">
-            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
-            </svg>
-          </button>
-          <h2 className="text-sm font-semibold">Info</h2>
+          
+          <h2 className="text-sm font-semibold">{document?.name + "." + document?.extension}</h2>
         </div>
         <Button 
           variant="ghost" 
@@ -135,7 +132,10 @@ export default function FileInfoPanel({ fileId, onClose }: FileInfoPanelProps) {
                   <svg className="w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M14 3.5H2c-.55 0-1 .45-1 1v7c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-7c0-.55-.45-1-1-1z"/>
                   </svg>
+                  <Link to={`/dashboard/folder/${document.parent_id}`}>
                   <span className="text-xs text-gray-600">Saved in</span>
+                  </Link>
+                  
                 </div>
                 <p className="text-sm pl-6 text-gray-900">
                   {document?.path?.split('/').slice(0, -1).join('/') || 'Dropbox'}
@@ -188,16 +188,15 @@ export default function FileInfoPanel({ fileId, onClose }: FileInfoPanelProps) {
               </div>
 
               {/* Dimensions (for images) */}
-              {document?.mimeType?.startsWith('image/') && (
+              {/* {document?.mimeType?.startsWith('image/') && (
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <ImageIcon className="w-4 h-4 text-gray-400" />
                     <span className="text-xs text-gray-600">Dimensions</span>
                   </div>
-                  <p className="text-sm pl-6">{getDimensions()}</p>
-
+                  <p className="text-sm pl-6">{getDimensions(document?.mimeType)}</p>
                 </div>
-              )}
+              )} */}
 
               {/* User comments */}
               {document?.description && (

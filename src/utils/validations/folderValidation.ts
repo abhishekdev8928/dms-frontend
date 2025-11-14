@@ -63,18 +63,8 @@ export const getChildFoldersSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === "true"),
-  
-  // Type filter: "folder" or "documents" (note: backend uses "documents" not "document")
-  type: z.enum(["folder", "documents"]).optional(),
-  
-  // Extension filter: specific file types
-  extension: z.enum(ALLOWED_EXTENSIONS).optional(),
-  
-  // User email filter: filter by creator/owner
-  userEmail: z.string().email().optional(),
-  
-  // Search filter: search by name or path
-  search: z.string().optional(),
+  type: z.string().optional(),
+  userEmail: z.string().optional(),
 });
 
 export type GetChildFoldersQuery = z.infer<typeof getChildFoldersSchema>;
@@ -112,34 +102,6 @@ export interface GetChildFoldersResponse {
   }>;
 }
 
-// Helper function to build query string
-export const buildChildFoldersQuery = (
-  params: Partial<GetChildFoldersQuery>
-): string => {
-  const queryParams = new URLSearchParams();
-  
-  if (params.includeDeleted) {
-    queryParams.append("includeDeleted", "true");
-  }
-  
-  if (params.type) {
-    queryParams.append("type", params.type);
-  }
-  
-  if (params.extension) {
-    queryParams.append("extension", params.extension);
-  }
-  
-  if (params.userEmail) {
-    queryParams.append("userEmail", params.userEmail);
-  }
-  
-  if (params.search) {
-    queryParams.append("search", params.search);
-  }
-  
-  return queryParams.toString();
-};
 
 
 // Get all descendants query
@@ -157,11 +119,7 @@ export const updateFolderSchema = z.object({
     .regex(/^[a-zA-Z0-9\s\-_&()]+$/)
     .transform(sanitize)
     .optional(),
-  description: z
-    .string()
-    .max(500)
-    .transform(sanitize)
-    .optional(),
+  description: z.string().max(500).transform(sanitize).optional(),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Invalid color format")
@@ -183,11 +141,7 @@ export const searchFoldersSchema = z.object({
     .min(1, "Search query is required")
     .max(100, "Search query too long")
     .transform(sanitize),
-  departmentName: z
-    .string()
-    .max(100)
-    .transform(sanitize)
-    .optional(),
+  departmentName: z.string().max(100).transform(sanitize).optional(),
 });
 
 // Get folder by path

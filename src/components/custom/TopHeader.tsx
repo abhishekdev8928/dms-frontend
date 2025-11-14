@@ -224,8 +224,8 @@ const TopHeader = () => {
                       {searchResults.data.results.map((item: any) => {
                         const isFolder = item.type === "folder";
                         const targetPath = isFolder
-                          ? `/folder/${item._id}`
-                          : `/folder/${item.parent_id}`;
+                          ? `/dashboard/folder/${item._id}`
+                          : `/dashboard/folder/${item.parent_id}`;
 
                         return (
                           <Link
@@ -242,7 +242,7 @@ const TopHeader = () => {
                                 {item.name}
                               </div>
                               <div className="text-sm text-gray-500 flex items-center gap-2 mt-0.5">
-                                <span>{item.createdBy?.name || "Unknown"}</span>
+                                <span>{item.createdBy?.username}</span>
                                 <span className="text-gray-300">•</span>
                                 <span>{format(new Date(item.updatedAt), "MMM d, yyyy")}</span>
                               </div>
