@@ -558,19 +558,19 @@ export default function RightPanelView() {
               </Button>
             </div>
           ) : isEmpty ? (
-            selectedTypeFilter && selectedTypeFilter.trim() !== "" ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center text-gray-600">
-                <img
-                  src="/no-results.svg"
-                  alt="No matching results"
-                  className="w-64 mb-6 opacity-80"
-                />
-                <h2 className="text-xl font-semibold">No matching results</h2>
-                <p className="text-gray-500 mt-2">
-                  Adjust your filters or try searching again.
-                </p>
-              </div>
-            ) : (
+            (selectedTypeFilter?.trim() !== "" || selectedUser?.trim() !== "") ? (
+      <div className="flex flex-col items-center justify-center py-24 text-center text-gray-600">
+        <img
+          src="https://ssl.gstatic.com/docs/doclist/images/empty_state_recents_v4.svg"
+          alt="No matching results"
+          className="w-64 mb-6 opacity-80"
+        />
+        <h2 className="text-xl font-semibold">No matching results</h2>
+        <p className="text-gray-500 mt-2">
+          Adjust your filters or try searching again.
+        </p>
+      </div>
+    ) : (
               <EmptyState
                 onUpload={() => fileInputRef.current?.click()}
                 dragActive={dragActive}
