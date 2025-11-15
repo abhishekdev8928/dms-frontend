@@ -2,6 +2,8 @@ import axios from 'axios';
 import Cookies from 'js-cookie';
 import { useAuthStore } from '@/config/store/authStore'; // Adjust path as needed
 
+
+// added production
 const httpClient = axios.create({
   baseURL: "https://digihostinfra.com/api", 
   timeout: 30000,
