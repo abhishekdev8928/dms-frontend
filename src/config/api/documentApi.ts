@@ -206,10 +206,11 @@ export const searchDocuments = async (
  * Access: Private
  */
 export const generateDownloadUrl = async (id: string) => {
-  const validated = documentIdSchema.parse({ id });
-  const res = await httpClient.get(`/documents/${validated.id}/download`);
+  const res = await httpClient.get(`/documents/${id}/download`);
   return res.data;
 };
+
+
 
 /* =======================================================
    VERSION MANAGEMENT

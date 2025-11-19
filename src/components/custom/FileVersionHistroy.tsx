@@ -48,6 +48,7 @@ interface VersionInfo {
     extension:string;
   };
   name:string,
+  originalName:string,
   versionNumber: number;
   extension:string;
   fileUrl: string;
@@ -111,6 +112,8 @@ export default function GoogleDriveVersionHistory() {
 
   const [revertDialogOpen, setRevertDialogOpen] = React.useState(false);
   const [selectedVersion, setSelectedVersion] = React.useState<VersionInfo | null>(null);
+  const [downloadingVersionId, setDownloadingVersionId] = React.useState<string | null>(null);
+
 
   // Fetch version history
   const {
@@ -146,18 +149,19 @@ export default function GoogleDriveVersionHistory() {
   });
 
   // Download mutation
-  const downloadMutation = useMutation({
-    mutationFn: (docId: string) => generateDownloadUrl(docId),
-    onSuccess: (data) => {
-      if (data?.data?.url) {
-        window.open(data.data.url, "_blank");
-        toast.success("Download started");
-      }
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Failed to download file");
-    },
-  });
+const downloadMutation = useMutation({
+  mutationFn: async (id: string) => generateDownloadUrl(id),
+  onSuccess: (data) => {
+    const url = data?.data?.url;
+    if (url) window.open(url, "_blank");
+    toast.success("Download started");
+  },
+  onError: () => toast.error("Failed to download"),
+});
+
+
+
+
 
   const handleRestore = (version: VersionInfo) => {
     setSelectedVersion(version);
@@ -173,10 +177,14 @@ export default function GoogleDriveVersionHistory() {
     }
   };
 
-  const handleDownload = (version: VersionInfo) => {
-    // Use documentId from the version's populated documentId field
-    downloadMutation.mutate(version.documentId._id);
-  };
+ const handleDownload = (version: VersionInfo) => {
+  setDownloadingVersionId(version._id);
+
+  downloadMutation.mutate(version._id, {
+    onSettled: () => setDownloadingVersionId(null),
+  });
+};
+
 
   // Loading state
   if (isLoading) {
@@ -268,61 +276,89 @@ export default function GoogleDriveVersionHistory() {
           {/* Version List */}
           <div className="space-y-8">
             {/* Current Version Section */}
-            {currentVersion && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-3 pb-3 border-b border-gray-200">
-                  {getDateLabel(currentVersion.createdAt)}
-                </h3>
-                
-                <div className="py-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    {/* File Icon */}
-                    <div className="flex-shrink-0 w-10 flex items-center justify-center">
-                     {(() => {
-  const { icon: Icon, color } = getFileIcon(currentVersion.type );
-  return <Icon className="w-6 h-6" style={{ color }} />;
-})()}
+          {currentVersion && (
+  <div>
+    <h3 className="text-sm font-medium text-gray-700 mb-3 pb-3 border-b border-gray-200">
+      {getDateLabel(currentVersion.createdAt)}
+    </h3>
 
+    <div className="py-4 hover:bg-gray-50 transition-colors">
+      <div className="flex items-center gap-4">
+        {/* File Icon */}
+        <div className="flex-shrink-0 w-10 flex items-center justify-center">
+          {(() => {
+            const { icon: Icon, color } = getFileIcon(currentVersion.type);
+            return <Icon className="w-6 h-6" style={{ color }} />;
+          })()}
+        </div>
 
-                    </div>
-                    
-                    {/* File Info */}
-                    <div className="flex-1 min-w-0" style={{ minWidth: '250px' }}>
-                      <p className="text-sm text-gray-900 truncate mb-1">
-                        {currentVersion.name + "." +currentVersion.extension}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatDateTime(currentVersion.createdAt)}
-                      </p>
-                    </div>
+        {/* File Info */}
+        <div className="flex-1 min-w-0" style={{ minWidth: "250px" }}>
+          <p className="text-sm text-gray-900 truncate mb-1">
+            {currentVersion.originalName}
+          </p>
+          <p className="text-xs text-gray-500">
+            {formatDateTime(currentVersion.createdAt)}
+          </p>
+        </div>
 
-                    {/* Action Label */}
-                    <div className="flex-shrink-0" style={{ minWidth: '100px' }}>
-                      <p className="text-sm text-gray-600">
-                        {currentVersion.changeDescription || "Added"}
-                      </p>
-                    </div>
+        {/* Action Label */}
+        <div className="flex-shrink-0" style={{ minWidth: "100px" }}>
+          <p className="text-sm text-gray-600">
+            {currentVersion.changeDescription || "Added"}
+          </p>
+        </div>
 
-                    {/* User Info */}
-                    <div className="flex-shrink-0" style={{ minWidth: '200px' }}>
-                      <p className="text-sm text-gray-600">
-                        {currentVersion.createdBy?.email || "Unknown"}
-                      </p>
-                    </div>
+        {/* User Info */}
+        <div className="flex-shrink-0" style={{ minWidth: "200px" }}>
+          <p className="text-sm text-gray-600">
+            {currentVersion.createdBy?.email || "Unknown"}
+          </p>
+        </div>
 
-                    {/* File Size */}
-                    <div className="flex-shrink-0 text-right" style={{ minWidth: '80px' }}>
-                      <p className="text-sm text-gray-600">{currentVersion.sizeFormatted}</p>
-                    </div>
+        {/* File Size */}
+        <div className="flex-shrink-0 text-right" style={{ minWidth: "80px" }}>
+          <p className="text-sm text-gray-600">
+            {currentVersion.sizeFormatted}
+          </p>
+        </div>
 
-                    {/* Current Version Badge */}
-                    <div className="flex-shrink-0 text-right" style={{ minWidth: '130px' }}>
-                      <span className="text-sm text-gray-400">Current version</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+        {/* Dropdown for Current Version */}
+        <div className="flex-shrink-0 text-right" style={{ minWidth: "130px" }}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hover:bg-gray-200 h-8 w-8 p-0"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-48">
+
+              {/* ONLY DOWNLOAD — NO RESTORE FOR CURRENT VERSION */}
+              <DropdownMenuItem
+                onClick={() => handleDownload(currentVersion)}
+                disabled={downloadingVersionId === currentVersion._id}
+                className="cursor-pointer"
+              >
+                {downloadingVersionId === currentVersion._id ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Download 
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
 
             {/* Older Versions */}
             {olderVersions.map((version) => (
@@ -340,7 +376,7 @@ export default function GoogleDriveVersionHistory() {
                     {/* File Info */}
                     <div className="flex-1 min-w-0" style={{ minWidth: '250px' }}>
                       <p className="text-sm text-gray-900 truncate mb-1">
-                        {version.name + "." + version.extension}
+                        {version.originalName}
                       </p>
                       <p className="text-xs text-gray-500">
                         {formatDateTime(version.createdAt)}
@@ -357,7 +393,7 @@ export default function GoogleDriveVersionHistory() {
                     {/* User Info */}
                     <div className="flex-shrink-0" style={{ minWidth: '200px' }}>
                       <p className="text-sm text-gray-600">
-                        {version.createdBy?.name || "Unknown"} on Web
+                        {version.createdBy?.email || "Unknown"} 
                       </p>
                     </div>
 
@@ -386,18 +422,20 @@ export default function GoogleDriveVersionHistory() {
                             <RotateCcw className="w-4 h-4 mr-2" />
                             Restore this version
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDownload(version)}
-                            className="cursor-pointer"
-                            disabled={downloadMutation.isPending}
-                          >
-                            {downloadMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            ) : (
-                              <Download className="w-4 h-4 mr-2" />
-                            )}
-                            Download
-                          </DropdownMenuItem>
+                        <DropdownMenuItem
+  onClick={() => handleDownload(version)}
+  className="cursor-pointer"
+  disabled={downloadingVersionId === version._id}
+>
+  {downloadingVersionId === version._id ? (
+    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+  ) : (
+    <Download className="w-4 h-4 mr-2" />
+  )}
+  Download
+</DropdownMenuItem>
+
+
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

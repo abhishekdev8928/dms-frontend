@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
@@ -59,6 +59,11 @@ import CreateFolderModal from "@/components/RightPanelView/Modals/CreateFolderMo
 import RenameDocumentModal from "@/components/RightPanelView/Modals/RenameDocumentModal";
 
 import type { FileItem, Breadcrumb } from "@/types/fileSystem";
+import { BulkActionToolbar } from "@/components/custom/BulkActionToolbar";
+import { bulkDeleteion } from "@/config/api/commonApi";
+import { DepartmentModal } from "@/components/RightPanelView/Modals/DepartmentModal";
+import type { Department } from "@/config/api/departmentApi";
+import { useDepartmentMutation } from "@/hooks/Mutation/useDepartmentMutation";
 
 const getFormattedDateTime = () => {
   const now = new Date();
@@ -94,16 +99,94 @@ export default function RightPanelView() {
   const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<FileItem | null>(null);
 
+  const { updateMutation } = useDepartmentMutation();
+
   // Modal states
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
+  const [departmentModalOpen, setDepartmentModalOpen] = useState(false);
+  const [departmentModalMode, setDepartmentModalMode] = useState<
+    "add" | "edit"
+  >("add");
+  const [selectedDepartment, setSelectedDepartment] =
+    useState<Department | null>(null);
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reuploadInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedIds, setSelectedIds] = useState<{
+    fileIds: string[];
+    folderIds: string[];
+  }>({
+    fileIds: [],
+    folderIds: [],
+  });
+  const handleDepartmentSubmit = (data: any) => {
+    if (selectedDepartment?._id) {
+      updateMutation.mutate(
+        {
+          id: selectedDepartment._id,
+          data: { name: data.name },
+        },
+        {
+          onSuccess: () => {
+            setDepartmentModalOpen(false);
+            setSelectedDepartment(null);
+          },
+        }
+      );
+    }
+  };
+
+  const getSelectedItemDetails = (selectedIds: { fileIds: string[]; folderIds: string[] }, items: FileItem[]) => {
+  const totalSelected = selectedIds.fileIds.length + selectedIds.folderIds.length;
+  
+  if (totalSelected !== 1) return null;
+  
+  // Find the single selected item
+  const selectedId = selectedIds.fileIds[0] || selectedIds.folderIds[0];
+  const selectedItem = items.find(item => item._id === selectedId);
+  
+  return selectedItem || null;
+};
+  const handleItemSelection = (
+  e: React.MouseEvent<HTMLDivElement, MouseEvent>,
+  item: { id: string; type: string }
+): void => {
+  const key = item.type === "folder" ? "folderIds" : "fileIds";
+
+  if (e.ctrlKey || e.metaKey) {
+    setSelectedIds((prev) => {
+      const exists = prev[key].includes(item.id);
+
+      return {
+        ...prev,
+        [key]: exists
+          ? prev[key].filter((id) => id !== item.id) // remove
+          : [...prev[key], item.id], // add
+      };
+    });
+  } else {
+    // SINGLE SELECT
+    const newSelectedIds = {
+      fileIds: item.type !== "folder" ? [item.id] : [],
+      folderIds: item.type === "folder" ? [item.id] : [],
+    };
+    setSelectedIds(newSelectedIds);
+    
+    // Auto-show info panel when single item is selected
+    const selectedItem = items.find(i => i._id === item.id);
+    if (selectedItem) {
+      setSelectedItem(selectedItem);
+      setSelectedFileId(item.id);
+      setShowInfoPanel(true);
+    }
+  }
+};
 
   // Queries
   const {
@@ -149,6 +232,7 @@ export default function RightPanelView() {
     updateDocumentMutation,
     deleteDocumentMutation,
     addTagsMutation,
+    bulkDeletionMutation,
   } = useDocumentMutations(
     parentId,
     selectedFileId,
@@ -302,10 +386,11 @@ export default function RightPanelView() {
     }
   };
 
-  const handleShowInfo = (fileId: string) => {
-    setSelectedFileId(fileId);
-    setShowInfoPanel(true);
-  };
+  const handleShowInfo = (item: FileItem) => {
+  setSelectedFileId(item._id);
+  setSelectedItem(item); // Add this
+  setShowInfoPanel(true);
+};
 
   const handleItemClick = (item: FileItem) => {
     if (item.type === "folder") {
@@ -360,15 +445,57 @@ export default function RightPanelView() {
     setCreateFolderModalOpen(true);
   };
 
-  const handleFileUploadClick = () => {
-    setActionsDropdownOpen(false);
-    fileInputRef.current?.click();
+  // const handleFileUploadClick = () => {
+  //   setActionsDropdownOpen(false);
+  //   fileInputRef.current?.click();
+  // };
+
+  // const handleFolderUploadClick = () => {
+  //   setActionsDropdownOpen(false);
+  //   folderInputRef.current?.click();
+  // };
+
+  const BulkActionToolBarProps = {
+    onClearSelection: () =>
+      setSelectedIds({
+        fileIds: [],
+        folderIds: [],
+      }),
+    selectionCount: selectedIds.fileIds.length + selectedIds.folderIds.length,
+    onDeleteSelected: () => bulkDeletionMutation.mutate(selectedIds),
   };
 
-  const handleFolderUploadClick = () => {
-    setActionsDropdownOpen(false);
-    folderInputRef.current?.click();
-  };
+  const muatate = useMutation({
+    mutationFn: bulkDeleteion,
+    onSuccess: (res) => console.log(res),
+    onError: (error) => console.log(error),
+  });
+
+  React.useEffect(() => {
+  const totalSelected = selectedIds.fileIds.length + selectedIds.folderIds.length;
+  
+  if (totalSelected === 1) {
+    // Show info panel for single selection
+    const selectedId = selectedIds.fileIds[0] || selectedIds.folderIds[0];
+    const selectedItem = items.find(item => item._id === selectedId);
+    
+    if (selectedItem) {
+      setSelectedItem(selectedItem);
+      setSelectedFileId(selectedId);
+      setShowInfoPanel(true);
+    }
+  } else if (totalSelected > 1) {
+    // Hide info panel for multiple selections
+    setShowInfoPanel(false);
+    setSelectedItem(null);
+    setSelectedFileId(null);
+  } else {
+    // No selection - optionally hide panel
+    // setShowInfoPanel(false);
+    // setSelectedItem(null);
+    // setSelectedFileId(null);
+  }
+}, [selectedIds, items]);
 
   return (
     <div className="h-full flex">
@@ -407,7 +534,10 @@ export default function RightPanelView() {
                               )}
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-[220px]">
+                          <DropdownMenuContent
+                            align="start"
+                            className="w-[220px]"
+                          >
                             <DropdownMenuItem
                               className="py-2 cursor-pointer"
                               onClick={handleCreateFolderClick}
@@ -422,18 +552,38 @@ export default function RightPanelView() {
                               className="py-2 cursor-pointer"
                               onClick={() => {
                                 if (breadcrumbs.length > 0) {
-                                  const currentCrumb = breadcrumbs[breadcrumbs.length - 1];
-                                  handleRename({
-                                    _id: currentCrumb._id,
-                                    name: currentCrumb.name,
-                                    type: 'folder',
-                                  } as FileItem);
+                                  const currentCrumb =
+                                    breadcrumbs[breadcrumbs.length - 1];
+
+                                  // Check the type and open appropriate modal
+                                  if (currentCrumb.type === "department") {
+                                    // Open department modal in edit mode
+                                    setDepartmentModalMode("edit");
+                                    setSelectedDepartment({
+                                      _id: currentCrumb._id,
+                                      name: currentCrumb.name,
+                                    } as Department);
+                                    setDepartmentModalOpen(true);
+                                  } else if (currentCrumb.type === "folder") {
+                                    // Open folder rename modal
+                                    handleRename({
+                                      _id: currentCrumb._id,
+                                      name: currentCrumb.name,
+                                      type: "folder",
+                                    } as FileItem);
+                                  }
+
                                   setActionsDropdownOpen(false);
                                 }
                               }}
                             >
                               <Edit className="w-4 h-4 mr-2 text-gray-600" />
-                              <span className="text-sm">Rename Folder</span>
+                              <span className="text-sm">
+                                Rename{" "}
+                                {crumb.type === "department"
+                                  ? "Department"
+                                  : "Folder"}
+                              </span>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
@@ -441,7 +591,9 @@ export default function RightPanelView() {
                               disabled
                             >
                               <Download className="w-4 h-4 mr-2 text-gray-400" />
-                              <span className="text-sm text-gray-400">Download (Coming Soon)</span>
+                              <span className="text-sm text-gray-400">
+                                Download (Coming Soon)
+                              </span>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
@@ -449,7 +601,9 @@ export default function RightPanelView() {
                               disabled
                             >
                               <Share2 className="w-4 h-4 mr-2 text-gray-400" />
-                              <span className="text-sm text-gray-400">Share (Coming Soon)</span>
+                              <span className="text-sm text-gray-400">
+                                Share (Coming Soon)
+                              </span>
                             </DropdownMenuItem>
 
                             <DropdownMenuSeparator />
@@ -458,11 +612,12 @@ export default function RightPanelView() {
                               className="py-2 cursor-pointer text-red-600 hover:text-red-700 focus:text-red-700"
                               onClick={() => {
                                 if (breadcrumbs.length > 0) {
-                                  const currentCrumb = breadcrumbs[breadcrumbs.length - 1];
+                                  const currentCrumb =
+                                    breadcrumbs[breadcrumbs.length - 1];
                                   handleDelete({
                                     _id: currentCrumb._id,
                                     name: currentCrumb.name,
-                                    type: 'folder',
+                                    type: "folder",
                                   } as FileItem);
                                   setActionsDropdownOpen(false);
                                 }
@@ -521,15 +676,19 @@ export default function RightPanelView() {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="right-panel-filter">
-          <FilterButtons
-            selectedTypeFilter={selectedTypeFilter}
-            setSelectedTypeFilter={setSelectedTypeFilter}
-            selectedUser={selectedUser}
-            setSelectedUser={setSelectedUser}
-            userData={usersData}
-          />
+          {selectedIds.fileIds.length > 0 ||
+          selectedIds.folderIds.length > 0 ? (
+            <BulkActionToolbar {...BulkActionToolBarProps} />
+          ) : (
+            <FilterButtons
+              selectedTypeFilter={selectedTypeFilter}
+              setSelectedTypeFilter={setSelectedTypeFilter}
+              selectedUser={selectedUser}
+              setSelectedUser={setSelectedUser}
+              userData={usersData}
+            />
+          )}
         </div>
 
         {/* Content */}
@@ -558,19 +717,19 @@ export default function RightPanelView() {
               </Button>
             </div>
           ) : isEmpty ? (
-            (selectedTypeFilter?.trim() !== "" || selectedUser?.trim() !== "") ? (
-      <div className="flex flex-col items-center justify-center py-24 text-center text-gray-600">
-        <img
-          src="https://ssl.gstatic.com/docs/doclist/images/empty_state_recents_v4.svg"
-          alt="No matching results"
-          className="w-64 mb-6 opacity-80"
-        />
-        <h2 className="text-xl font-semibold">No matching results</h2>
-        <p className="text-gray-500 mt-2">
-          Adjust your filters or try searching again.
-        </p>
-      </div>
-    ) : (
+            selectedTypeFilter?.trim() !== "" || selectedUser?.trim() !== "" ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center text-gray-600">
+                <img
+                  src="https://ssl.gstatic.com/docs/doclist/images/empty_state_recents_v4.svg"
+                  alt="No matching results"
+                  className="w-64 mb-6 opacity-80"
+                />
+                <h2 className="text-xl font-semibold">No matching results</h2>
+                <p className="text-gray-500 mt-2">
+                  Adjust your filters or try searching again.
+                </p>
+              </div>
+            ) : (
               <EmptyState
                 onUpload={() => fileInputRef.current?.click()}
                 dragActive={dragActive}
@@ -582,6 +741,8 @@ export default function RightPanelView() {
               <div className="p-4">
                 {viewMode === "list" ? (
                   <ListView
+                    selectedIds={selectedIds}
+                    onSelectItem={handleItemSelection}
                     items={items}
                     onItemClick={handleItemClick}
                     onRename={handleRename}
@@ -644,16 +805,20 @@ export default function RightPanelView() {
         />
       </div>
 
-      {/* Info Panel */}
-      {showInfoPanel && (
-        <FileInfoPanel
-          fileId={selectedFileId}
-          onClose={() => {
-            setShowInfoPanel(false);
-            setSelectedFileId(null);
-          }}
-        />
-      )}
+     {showInfoPanel && selectedItem && (
+  selectedIds.fileIds.length + selectedIds.folderIds.length === 1 ? (
+    <FileInfoPanel
+      item={selectedItem}
+      onClose={() => {
+        setShowInfoPanel(false);
+        setSelectedFileId(null);
+        setSelectedItem(null);
+        // Optionally clear selection
+        setSelectedIds({ fileIds: [], folderIds: [] });
+      }}
+    />
+  ) : null
+)}
 
       {/* Modals */}
       <CreateFolderModal
@@ -734,6 +899,19 @@ export default function RightPanelView() {
         }
       />
 
+      <DepartmentModal
+        open={departmentModalOpen}
+        onOpenChange={(open) => {
+          setDepartmentModalOpen(open);
+          if (!open) {
+            setSelectedDepartment(null);
+          }
+        }}
+        mode={departmentModalMode}
+        department={selectedDepartment}
+        onSubmit={handleDepartmentSubmit}
+        isLoading={updateMutation.isPending}
+      />
       <TagsModal
         open={tagsModalOpen}
         onOpenChange={setTagsModalOpen}

@@ -16,14 +16,15 @@ import {
 } from "@/components/ui/popover";
 
 const fileTypes = [
-  { value: "", label: "All Types" },
-  { value: "folder", label: "Folders" },
-  { value: "pdf", label: "PDF" },
+  { value: "", label: "All Types" }, // keep first
   { value: "docs", label: "Docs" },
+  { value: "folder", label: "Folders" },
   { value: "image", label: "Images" },
+  { value: "pdf", label: "PDF" },
   { value: "video", label: "Videos" },
   { value: "zip", label: "Zip Files" },
 ];
+
 
 // ✅ Add proper TypeScript interface
 interface User {

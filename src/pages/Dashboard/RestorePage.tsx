@@ -369,7 +369,7 @@ const TrashScreen = () => {
                     <TableCell className="w-[160px] py-3">
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm text-gray-900 truncate">
-                          {item.deletedBy?.name || "—"}
+                          {item.deletedBy?.username || "—"}
                         </span>
                         {item.deletedBy?.email && (
                           <span

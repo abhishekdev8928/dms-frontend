@@ -36,6 +36,7 @@ import type { FileItem } from "@/types/fileSystem";
 
 interface ListViewProps {
   items: FileItem[];
+
   onItemClick: (item: FileItem) => void;
   onRename: (item: FileItem) => void;
   onDelete: (item: FileItem) => void;
@@ -43,6 +44,16 @@ interface ListViewProps {
   onShowInfo: (fileId: string) => void;
   onAddTags: (item: FileItem) => void;
   onReupload: (documentId: string) => void;
+
+  selectedIds: {
+    fileIds: string[];
+    folderIds: string[];
+  };
+
+  onSelectItem: (
+    event: React.MouseEvent<HTMLTableRowElement, MouseEvent>,
+    item: { id: string; type: string }
+  ) => void;
 }
 
 type SortField = "name" | "date";
@@ -57,100 +68,78 @@ export default function ListView({
   onShowInfo,
   onAddTags,
   onReupload,
+  selectedIds,
+  onSelectItem,
 }: ListViewProps) {
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
 
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+    return new Date(dateString).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+    });
   };
 
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return "—";
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
-    const mb = kb / 1024;
-    return `${mb.toFixed(1)} MB`;
+    return `${(kb / 1024).toFixed(1)} MB`;
   };
 
-  const isFolder = (item: FileItem): boolean => item.type === "folder";
+  const isFolder = (item: FileItem) => item.type === "folder";
 
-  const handleSort = (field: SortField): void => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
-    }
+  const handleSort = (field: SortField) => {
+    field === sortField
+      ? setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+      : (setSortField(field), setSortOrder("asc"));
   };
 
   const getSortedItems = (): FileItem[] => {
-    // First separate folders and files
-    const folders = items.filter(item => item.type === "folder");
-    const files = items.filter(item => item.type !== "folder");
+    const folders = items.filter((i) => i.type === "folder");
+    const files = items.filter((i) => i.type !== "folder");
 
-    // Sort folders
-    const sortedFolders = [...folders].sort((a, b) => {
+    const sortFn = (a: FileItem, b: FileItem) => {
       if (sortField === "name") {
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
         return sortOrder === "asc"
-          ? nameA.localeCompare(nameB)
-          : nameB.localeCompare(nameA);
-      } else {
-        const dateA = new Date(a.updatedAt).getTime();
-        const dateB = new Date(b.updatedAt).getTime();
-        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
       }
-    });
+      return sortOrder === "asc"
+        ? new Date(a.updatedAt).getTime() -
+            new Date(b.updatedAt).getTime()
+        : new Date(b.updatedAt).getTime() -
+            new Date(a.updatedAt).getTime();
+    };
 
-    // Sort files
-    const sortedFiles = [...files].sort((a, b) => {
-      if (sortField === "name") {
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
-        return sortOrder === "asc"
-          ? nameA.localeCompare(nameB)
-          : nameB.localeCompare(nameA);
-      } else {
-        const dateA = new Date(a.updatedAt).getTime();
-        const dateB = new Date(b.updatedAt).getTime();
-        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
-      }
-    });
-
-    // Return folders first, then files
-    return [...sortedFolders, ...sortedFiles];
+    return [...folders.sort(sortFn), ...files.sort(sortFn)];
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    const isActive = sortField === field;
-    if (!isActive) return null;
-    return sortOrder === "asc" ? (
-      <ArrowUp className="w-4 h-4" />
-    ) : (
-      <ArrowDown className="w-4 h-4" />
-    );
-  };
+  const SortIcon = ({ field }: { field: SortField }) =>
+    sortField === field ? (
+      sortOrder === "asc" ? (
+        <ArrowUp className="w-4 h-4" />
+      ) : (
+        <ArrowDown className="w-4 h-4" />
+      )
+    ) : null;
 
-  const getInitials = (name: string): string => {
-    return name
+  const getInitials = (name: string) =>
+    name
       .split(" ")
-      .map((word) => word[0])
+      .map((w) => w[0])
       .join("")
       .toUpperCase()
       .slice(0, 2);
-  };
 
-  const getCreatorInfo = (
-    item: FileItem
-  ): { username: string; email: string; initials: string } => {
+  const getCreatorInfo = (item: FileItem) => {
     const username = item.createdBy.username || "Unknown";
-    const email = item.createdBy.email || "";
-    const initials = username !== "Unknown" ? getInitials(username) : "UN";
-
-    return { username, email, initials };
+    return {
+      username,
+      email: item.createdBy.email || "",
+      initials: username !== "Unknown" ? getInitials(username) : "UN",
+    };
   };
 
   const sortedItems = getSortedItems();
@@ -164,101 +153,110 @@ export default function ListView({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <th
-                    className="text-left px-6 py-3 text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900 group"
+                    className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer group"
                     onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center gap-2">
                       Name
-                      <div
-                        className={`transition-opacity ${
+                      <span
+                        className={`${
                           sortField === "name"
                             ? "opacity-100"
                             : "opacity-0 group-hover:opacity-100"
                         }`}
                       >
                         <SortIcon field="name" />
-                      </div>
+                      </span>
                     </div>
                   </th>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>
-                    {sortField === "name"
-                      ? `Click to sort ${sortOrder === "asc" ? "Z → A" : "A → Z"}`
-                      : "Sort A → Z"}
-                  </p>
+                  {sortField === "name"
+                    ? `Click to sort ${
+                        sortOrder === "asc" ? "Z → A" : "A → Z"
+                      }`
+                    : "Sort A → Z"}
                 </TooltipContent>
               </Tooltip>
 
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-700 w-64">
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 w-64">
                 Owner
               </th>
 
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-700 w-48">
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 w-48">
                 Date created
               </th>
 
               <Tooltip>
                 <TooltipTrigger asChild>
                   <th
-                    className="text-left px-6 py-3 text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900 group w-48"
+                    className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer group w-48"
                     onClick={() => handleSort("date")}
                   >
                     <div className="flex items-center gap-2">
                       Date modified
-                      <div
-                        className={`transition-opacity ${
+                      <span
+                        className={`${
                           sortField === "date"
                             ? "opacity-100"
                             : "opacity-0 group-hover:opacity-100"
                         }`}
                       >
                         <SortIcon field="date" />
-                      </div>
+                      </span>
                     </div>
                   </th>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>
-                    {sortField === "date"
-                      ? `Click to sort ${
-                          sortOrder === "asc"
-                            ? "Newest → Oldest"
-                            : "Oldest → Newest"
-                        }`
-                      : "Sort Oldest → Newest"}
-                  </p>
+                  {sortField === "date"
+                    ? `Click to sort ${
+                        sortOrder === "asc"
+                          ? "Newest → Oldest"
+                          : "Oldest → Newest"
+                      }`
+                    : "Sort Oldest → Newest"}
                 </TooltipContent>
               </Tooltip>
 
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-700 w-32">
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 w-32">
                 File size
               </th>
 
-              <th className="text-center px-6 py-3 w-12">
-                <MoreVertical className="w-4 h-4 text-gray-500 mx-auto" />
+              <th className="px-6 py-3 text-center w-12">
+                <MoreVertical className="w-4 h-4 mx-auto text-gray-500" />
               </th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-gray-100">
-            {sortedItems.map((item: FileItem) => {
+            {sortedItems.map((item) => {
               const creator = getCreatorInfo(item);
+
+              const isSelected =
+                item.type === "folder"
+                  ? selectedIds.folderIds.includes(item._id)
+                  : selectedIds.fileIds.includes(item._id);
 
               return (
                 <tr
                   key={item._id}
-                  className="transition-colors hover:bg-gray-50 cursor-pointer"
-                  onClick={() => onItemClick(item)}
+                  className={`transition-colors ${
+                    isSelected ? "bg-[#c1e7ff]" : ""
+                  } cursor-pointer`}
+                  onClick={(e) =>
+                    onSelectItem(e, { id: item._id, type: item.type })
+                  }
                 >
-                  {/* Name column */}
-                  <td className="px-6 py-4">
+                  {/* Name */}
+                  <td className="px-6 py-2">
                     <div className="flex items-center gap-3">
                       {isFolder(item) ? (
                         <>
                           <div
-                            className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: item.color || "#64748B" }}
+                            className="w-6 h-6 rounded flex items-center justify-center"
+                            style={{
+                              backgroundColor: item.color || "#64748B",
+                            }}
                           >
                             <Folder className="w-4 h-4 text-white" />
                           </div>
@@ -268,7 +266,7 @@ export default function ListView({
                         </>
                       ) : (
                         <>
-                          <FileText className="w-6 h-6 text-gray-600 flex-shrink-0" />
+                          <FileText className="w-6 h-6 text-gray-600" />
                           <span className="text-sm font-medium text-gray-800 truncate">
                             {item.extension
                               ? `${item.name}.${item.extension}`
@@ -279,15 +277,15 @@ export default function ListView({
                     </div>
                   </td>
 
-                  {/* Owner column */}
-                  <td className="px-6 py-4">
+                  {/* Owner */}
+                  <td className="px-6 py-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center">
                         <span className="text-white text-sm font-medium">
                           {creator.initials}
                         </span>
                       </div>
-                      <div className="flex flex-col min-w-0">
+                      <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900 truncate">
                           {creator.username}
                         </span>
@@ -300,22 +298,23 @@ export default function ListView({
                     </div>
                   </td>
 
-                  {/* Date created column */}
+                  {/* Date */}
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {formatDate(item.createdAt)}
                   </td>
 
-                  {/* Date modified column */}
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {formatDate(item.updatedAt)}
                   </td>
 
-                  {/* Size column */}
+                  {/* Size */}
                   <td className="px-6 py-4 text-sm text-gray-600">
-                    {isFolder(item) ? "—" : formatFileSize(item.size)}
+                    {isFolder(item)
+                      ? "—"
+                      : formatFileSize(item.size)}
                   </td>
 
-                  {/* Actions column */}
+                  {/* Actions */}
                   <td className="px-6 py-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger
@@ -326,6 +325,7 @@ export default function ListView({
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
+
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem
                           onClick={(e) => {
@@ -370,7 +370,7 @@ export default function ListView({
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toast.info("Manage Access feature coming soon");
+                                toast.info("Coming soon");
                               }}
                             >
                               <Users className="w-4 h-4 mr-2" /> Manage Access
@@ -385,12 +385,11 @@ export default function ListView({
                               <RefreshCw className="w-4 h-4 mr-2" /> Reupload
                             </DropdownMenuItem>
 
-                            <DropdownMenuItem
-                              onClick={(e) => e.stopPropagation()}
-                            >
+                            <DropdownMenuItem>
                               <Link
-                                className="flex items-center"
                                 to={`/document/version-history/${item._id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center"
                               >
                                 <History className="w-4 h-4 mr-2" /> Version
                                 History
@@ -400,7 +399,7 @@ export default function ListView({
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toast.info("Activity feature coming soon");
+                                toast.info("Coming soon");
                               }}
                             >
                               <Activity className="w-4 h-4 mr-2" /> Activity
@@ -408,18 +407,8 @@ export default function ListView({
                           </>
                         )}
 
-                        {isFolder(item) && (
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toast.info("Manage Access feature coming soon");
-                            }}
-                          >
-                            <Users className="w-4 h-4 mr-2" /> Manage Access
-                          </DropdownMenuItem>
-                        )}
-
                         <DropdownMenuSeparator />
+
                         <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {

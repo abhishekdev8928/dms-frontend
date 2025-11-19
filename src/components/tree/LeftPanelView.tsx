@@ -451,29 +451,6 @@ export const LeftPanelView = () => {
 
               <DropdownMenuContent align="start" className="w-[240px]">
                 <DropdownMenuItem
-                  className="py-2 cursor-pointer"
-                  onClick={() => setIsDeptModalOpen(true)}
-                >
-                  <LucideBuilding2 className="w-4 h-4 mr-2 text-gray-600" />
-                  <div className="flex-1">
-                    <div className="text-sm">Create Department</div>
-                  </div>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""}`}
-                  onClick={handleOpenFolderModal}
-                  disabled={!parentId}
-                >
-                  <Folder className="w-4 h-4 mr-2 text-gray-600" />
-                  <div className="flex-1">
-                    <div className="text-sm">Create Folder</div>
-                  </div>
-                </DropdownMenuItem>
-
-                <div className="h-px bg-gray-200 my-1" />
-
-                <DropdownMenuItem
                   className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""}`}
                   onClick={handleFileUploadClick}
                   disabled={fileUploadMutation.isPending || !parentId}
@@ -483,7 +460,6 @@ export const LeftPanelView = () => {
                     <div className="text-sm">File Upload</div>
                   </div>
                 </DropdownMenuItem>
-
                 <DropdownMenuItem
                   className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""}`}
                   onClick={handleFolderUploadClick}
@@ -494,6 +470,33 @@ export const LeftPanelView = () => {
                     <div className="text-sm">Folder Upload</div>
                   </div>
                 </DropdownMenuItem>
+                 <DropdownMenuItem
+                  className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""}`}
+                  onClick={handleOpenFolderModal}
+                  disabled={!parentId}
+                >
+                  <Folder className="w-4 h-4 mr-2 text-gray-600" />
+                  <div className="flex-1">
+                    <div className="text-sm">Create Folder</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="py-2 cursor-pointer"
+                  onClick={() => setIsDeptModalOpen(true)}
+                >
+                  <LucideBuilding2 className="w-4 h-4 mr-2 text-gray-600" />
+                  <div className="flex-1">
+                    <div className="text-sm">Create Department</div>
+                  </div>
+                </DropdownMenuItem>
+
+               
+
+               
+
+                
+
+                
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

@@ -1,33 +1,33 @@
-import  { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { toast } from 'sonner';
-import { 
-  CirclePlus, 
-  MoreVertical, 
-  Search, 
-  Pencil, 
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
+import {
+  CirclePlus,
+  MoreVertical,
+  Search,
+  Pencil,
   Trash2,
   ChevronLeft,
   ChevronRight,
   Loader2,
   Building2,
-  ArrowUpDown
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+  ArrowUpDown,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,8 +35,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { 
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -59,50 +59,60 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { 
-  getAllDepartments, 
-  createDepartment, 
-  updateDepartment, 
+import {
+  getAllDepartments,
+  createDepartment,
+  updateDepartment,
   deleteDepartment,
-  type Department 
-} from '@/config/api/departmentApi';
-import { createDepartmentSchema, updateDepartmentSchema } from '@/utils/validations/departmentValidation';
+  type Department,
+} from "@/config/api/departmentApi";
+import {
+  createDepartmentSchema,
+  updateDepartmentSchema,
+} from "@/utils/validations/departmentValidation";
+import { useNavigate } from "react-router-dom";
 
 const DepartmentManagement = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
-  
+  const [modalMode, setModalMode] = useState<"add" | "edit">("add");
+  const [selectedDepartment, setSelectedDepartment] =
+    useState<Department | null>(null);
+
   // React Hook Form - Create
   const createForm = useForm<z.infer<typeof createDepartmentSchema>>({
     resolver: zodResolver(createDepartmentSchema),
     defaultValues: {
-      name: '',
-    
-    }
+      name: "",
+    },
   });
 
   // React Hook Form - Update
   const updateForm = useForm<z.infer<typeof updateDepartmentSchema>>({
     resolver: zodResolver(updateDepartmentSchema),
     defaultValues: {
-      name: ''
-    }
+      name: "",
+    },
   });
 
   // Fetch departments
-  const { data: departmentsData, isLoading, isError } = useQuery({
-    queryKey: ['departments', currentPage, itemsPerPage, searchQuery],
-    queryFn: () => getAllDepartments({
-      page: currentPage,
-      limit: itemsPerPage,
-      search: searchQuery
-    })
+  const {
+    data: departmentsData,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["departments", currentPage, itemsPerPage, searchQuery],
+    queryFn: () =>
+      getAllDepartments({
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchQuery,
+      }),
   });
 
   // Create mutation
@@ -112,26 +122,30 @@ const DepartmentManagement = () => {
       toast.success("Department Created", {
         description: "The department has been successfully created.",
       });
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["tree"] });
       setShowModal(false);
       createForm.reset();
     },
     onError: (error: any) => {
       toast.error("Creation Failed", {
-        description: error?.response?.data?.message || error?.message || "Failed to create department.",
+        description:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Failed to create department.",
       });
-    }
+    },
   });
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => updateDepartment(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      updateDepartment(id, data),
     onSuccess: () => {
       toast.success("Department Updated", {
         description: "The department has been successfully updated.",
       });
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["tree"] });
       setShowModal(false);
       setSelectedDepartment(null);
@@ -139,9 +153,12 @@ const DepartmentManagement = () => {
     },
     onError: (error: any) => {
       toast.error("Update Failed", {
-        description: error?.response?.data?.message || error?.message || "Failed to update department.",
+        description:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Failed to update department.",
       });
-    }
+    },
   });
 
   // Delete mutation
@@ -151,33 +168,36 @@ const DepartmentManagement = () => {
       toast.success("Department Deleted", {
         description: "The department has been successfully deleted.",
       });
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["tree"] });
       setShowDeleteModal(false);
       setSelectedDepartment(null);
     },
     onError: (error: any) => {
       toast.error("Delete Failed", {
-        description: error?.response?.data?.message || error?.message || "Failed to delete department.",
+        description:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Failed to delete department.",
       });
-    }
+    },
   });
 
   const formatDate = (date: string | Date) => {
-  return new Date(date).toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'short'
-  });
-};
+    return new Date(date).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+    });
+  };
 
   const handleAdd = () => {
-    setModalMode('add');
-    createForm.reset({ name: '', description: '' });
+    setModalMode("add");
+    createForm.reset({ name: "", description: "" });
     setShowModal(true);
   };
 
   const handleEdit = (dept: Department) => {
-    setModalMode('edit');
+    setModalMode("edit");
     setSelectedDepartment(dept);
     updateForm.reset({
       name: dept.name,
@@ -199,14 +219,13 @@ const DepartmentManagement = () => {
 
   const onCreateSubmit = (data: z.infer<typeof createDepartmentSchema>) => {
     createMutation.mutate(data);
-
   };
 
   const onUpdateSubmit = (data: z.infer<typeof updateDepartmentSchema>) => {
     if (selectedDepartment) {
       updateMutation.mutate({
         id: selectedDepartment._id,
-        data
+        data,
       });
     }
   };
@@ -221,7 +240,9 @@ const DepartmentManagement = () => {
         <div className="text-center">
           <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold">Error Loading Departments</h3>
-          <p className="text-sm text-muted-foreground">Please try refreshing the page</p>
+          <p className="text-sm text-muted-foreground">
+            Please try refreshing the page
+          </p>
         </div>
       </div>
     );
@@ -243,8 +264,8 @@ const DepartmentManagement = () => {
             className="pl-9"
           />
         </div>
-        <Select 
-          value={itemsPerPage.toString()} 
+        <Select
+          value={itemsPerPage.toString()}
           onValueChange={(value) => {
             setItemsPerPage(Number(value));
             setCurrentPage(1);
@@ -276,7 +297,9 @@ const DepartmentManagement = () => {
           <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold">No departments found</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {searchQuery ? 'Try adjusting your search' : 'Get started by creating a new department'}
+            {searchQuery
+              ? "Try adjusting your search"
+              : "Get started by creating a new department"}
           </p>
           {!searchQuery && (
             <Button onClick={handleAdd}>
@@ -308,7 +331,11 @@ const DepartmentManagement = () => {
                   Date Modified
                 </TableHead>
                 <TableHead className="w-[70px] text-right">
-                  <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 ml-auto"
+                  >
                     <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
                   </Button>
                 </TableHead>
@@ -316,42 +343,53 @@ const DepartmentManagement = () => {
             </TableHeader>
             <TableBody>
               {departments.map((dept: Department) => (
-                <TableRow key={dept._id} className="border-b last:border-0 hover:bg-slate-50/50">
-                  <TableCell className="py-4">
+                <TableRow
+                 
+                  key={dept._id}
+                  className="border-b cursor-pointer last:border-0 hover:bg-slate-50/50"
+                >
+                  <TableCell  onClick={() => navigate(`/dashboard/folder/${dept._id}`)} className="py-4">
                     <div className="flex items-center gap-3">
                       <Building2 className="h-5 w-5 text-slate-500" />
-                      <span className="font-normal text-slate-900">{dept.name}</span>
+                      <span className="font-normal text-slate-900">
+                        {dept.name}
+                      </span>
                     </div>
                   </TableCell>
-                <TableCell className="hidden lg:table-cell py-4">
-  <div className="flex items-center gap-2">
-    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-medium text-slate-600">
-      {typeof dept.createdBy === 'object' && dept.createdBy?.username
-        ? dept.createdBy.username.charAt(0).toUpperCase()
-        : 'N'}
-    </div>
-    <div className="flex flex-col">
-      <span className="text-sm text-slate-900">
-        {typeof dept.createdBy === 'object' && dept.createdBy?.username
-          ? dept.createdBy.username
-          : 'N/A'}
-      </span>
-      <span className="text-xs text-slate-500">
-        {typeof dept.createdBy === 'object' && dept.createdBy?.email
-          ? dept.createdBy.email
-          : ''}
-      </span>
-    </div>
-  </div>
-</TableCell>
                   <TableCell className="hidden lg:table-cell py-4">
-                    <Badge 
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-medium text-slate-600">
+                        {typeof dept.createdBy === "object" &&
+                        dept.createdBy?.username
+                          ? dept.createdBy.username.charAt(0).toUpperCase()
+                          : "N"}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-slate-900">
+                          {typeof dept.createdBy === "object" &&
+                          dept.createdBy?.username
+                            ? dept.createdBy.username
+                            : "N/A"}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {typeof dept.createdBy === "object" &&
+                          dept.createdBy?.email
+                            ? dept.createdBy.email
+                            : ""}
+                        </span>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell py-4">
+                    <Badge
                       variant={dept.isActive ? "default" : "secondary"}
-                      className={dept.isActive 
-                        ? "bg-green-100 text-green-700 hover:bg-green-100" 
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-100"}
+                      className={
+                        dept.isActive
+                          ? "bg-green-100 text-green-700 hover:bg-green-100"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-100"
+                      }
                     >
-                      {dept.isActive ? 'Active' : 'Inactive'}
+                      {dept.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden xl:table-cell text-slate-700 py-4">
@@ -393,15 +431,21 @@ const DepartmentManagement = () => {
       {departments.length > 0 && (
         <div className="flex items-center justify-between bg-white p-4 rounded-lg border">
           <p className="text-sm text-muted-foreground">
-            Showing <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> to{' '}
-            <span className="font-medium">{Math.min(currentPage * itemsPerPage, totalCount)}</span> of{' '}
-            <span className="font-medium">{totalCount}</span> departments
+            Showing{" "}
+            <span className="font-medium">
+              {(currentPage - 1) * itemsPerPage + 1}
+            </span>{" "}
+            to{" "}
+            <span className="font-medium">
+              {Math.min(currentPage * itemsPerPage, totalCount)}
+            </span>{" "}
+            of <span className="font-medium">{totalCount}</span> departments
           </p>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -419,7 +463,7 @@ const DepartmentManagement = () => {
                 } else {
                   pageNum = currentPage - 2 + i;
                 }
-                
+
                 return (
                   <Button
                     key={pageNum}
@@ -436,7 +480,9 @@ const DepartmentManagement = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
               disabled={currentPage === totalPages}
             >
               Next
@@ -459,10 +505,13 @@ const DepartmentManagement = () => {
                 : "Update the department information below."}
             </DialogDescription>
           </DialogHeader>
-          
-          {modalMode === 'add' ? (
+
+          {modalMode === "add" ? (
             <Form {...createForm}>
-              <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-4">
+              <form
+                onSubmit={createForm.handleSubmit(onCreateSubmit)}
+                className="space-y-4"
+              >
                 <FormField
                   control={createForm.control}
                   name="name"
@@ -478,22 +527,29 @@ const DepartmentManagement = () => {
                     </FormItem>
                   )}
                 />
-                
-               
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowModal(false)}
+                  >
                     Cancel
                   </Button>
                   <Button type="submit" disabled={createMutation.isPending}>
-                    {createMutation.isPending ? "Creating..." : "Create Department"}
+                    {createMutation.isPending
+                      ? "Creating..."
+                      : "Create Department"}
                   </Button>
                 </DialogFooter>
               </form>
             </Form>
           ) : (
             <Form {...updateForm}>
-              <form onSubmit={updateForm.handleSubmit(onUpdateSubmit)} className="space-y-4">
+              <form
+                onSubmit={updateForm.handleSubmit(onUpdateSubmit)}
+                className="space-y-4"
+              >
                 <FormField
                   control={updateForm.control}
                   name="name"
@@ -509,14 +565,19 @@ const DepartmentManagement = () => {
                     </FormItem>
                   )}
                 />
-                
-               
+
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowModal(false)}
+                  >
                     Cancel
                   </Button>
                   <Button type="submit" disabled={updateMutation.isPending}>
-                    {updateMutation.isPending ? "Updating..." : "Update Department"}
+                    {updateMutation.isPending
+                      ? "Updating..."
+                      : "Update Department"}
                   </Button>
                 </DialogFooter>
               </form>

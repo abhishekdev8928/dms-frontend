@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { updateDocument, deleteDocument, addTags } from "@/config/api/documentApi";
 import { reuploadFile } from "@/utils/helper/fileReuploadHelper";
+import { bulkDeleteion } from "@/config/api/commonApi";
 
 const getFormattedDateTime = () => {
   const now = new Date();
@@ -98,5 +99,13 @@ export const useDocumentMutations = (
     },
   });
 
-  return { reuploadMutation, updateDocumentMutation, deleteDocumentMutation, addTagsMutation };
+
+   const bulkDeletionMutation = useMutation({
+  mutationFn: (data: { fileIds: string[]; folderIds: string[] }) =>
+    bulkDeleteion(data),
+  onSuccess: (res) => console.log(res),
+  onError: (error) => console.log(error),
+});
+
+  return { reuploadMutation,bulkDeletionMutation, updateDocumentMutation, deleteDocumentMutation, addTagsMutation };
 };

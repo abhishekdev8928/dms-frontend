@@ -175,18 +175,18 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
   };
 
   return (
-    <Card {...props}>
-      <CardHeader>
-        <CardTitle>Enter verification code</CardTitle>
-        <CardDescription>
+    <Card {...props} className="border-0 shadow-none py-[60px] lg:py-1">
+      <CardHeader className="lg:px-6 px-0">
+        <CardTitle className="lg:text-[30px] text-[28px] text-[#035C4C] text-center lg:text-start ">Enter verification code</CardTitle>
+        <CardDescription className="text-[16px] text-[#535353]">
           We sent a 6-digit code to your email.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="lg:px-6 px-0">
         <form onSubmit={handleSubmit(onSubmit)}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="otp">Verification code</FieldLabel>
+              <FieldLabel htmlFor="otp" className="text-[16px] font-bold text-[#374151]">Verification code</FieldLabel>
               <Controller
                 name="otp"
                 control={control}
@@ -199,12 +199,12 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
                     disabled={verifyMutation.isPending}
                   >
                     <InputOTPGroup className="gap-2.5 *:data-[slot=input-otp-slot]:rounded-md *:data-[slot=input-otp-slot]:border">
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
+                      <InputOTPSlot index={0} className="bg-[#E5E7EB] lg:h-[60px] h-[40px] lg:w-[60px] w-[40px] text-[20px] " />
+                      <InputOTPSlot index={1} className="bg-[#E5E7EB]  lg:h-[60px] h-[40px] lg:w-[60px] w-[40px] text-[20px] "/>
+                      <InputOTPSlot index={2} className="bg-[#E5E7EB]  lg:h-[60px] h-[40px] lg:w-[60px] w-[40px] text-[20px] "/>
+                      <InputOTPSlot index={3} className="bg-[#E5E7EB]  lg:h-[60px] h-[40px] lg:w-[60px] w-[40px] text-[20px] "/>
+                      <InputOTPSlot index={4} className="bg-[#E5E7EB]  lg:h-[60px] h-[40px] lg:w-[60px] w-[40px] text-[20px] "/>
+                      <InputOTPSlot index={5} className="bg-[#E5E7EB]  lg:h-[60px] h-[40px] lg:w-[60px] w-[40px] text-[20px] "/>
                     </InputOTPGroup>
                   </InputOTP>
                 )}
@@ -214,7 +214,7 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
                   {errors.otp.message}
                 </p>
               )}
-              <FieldDescription>
+              <FieldDescription className="lg:text-[16px] text-[12px] text-[#535353]">
                 Enter the 6-digit code sent to your email.
               </FieldDescription>
             </Field>
@@ -223,7 +223,7 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
               <Button
                 type="submit"
                 disabled={verifyMutation.isPending}
-                className="w-full"
+                className="w-full bg-[#035C4C] lg:text-[24px] text-[20px] font-bold lg:p-[32px] p-[30px]"
               >
                 {verifyMutation.isPending ? (
                   <>
@@ -241,7 +241,7 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
                   type="button"
                   onClick={handleResendOTP}
                   disabled={resendTimer > 0 || resendMutation.isPending}
-                  className="font-medium underline underline-offset-4 hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="font-medium text-[#035C4C] underline underline-offset-4 hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {resendTimer > 0 ? (
                     `Resend in ${resendTimer}s`

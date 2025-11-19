@@ -2,22 +2,21 @@ import { Button } from "@/components/ui/button";
 import { Download, Trash2, X, FolderInput, Share2 } from "lucide-react";
 
 interface BulkActionToolbarProps {
-  selectedCount: number;
+  selectionCount: number;
   onClearSelection: () => void;
-  onDelete: () => void;
-  onDownload: () => void;
+   onDeleteSelected: () => void;
+   onDownloadSelected: () => void;
 }
 
 export function BulkActionToolbar({
-  selectedCount,
+  selectionCount,
   onClearSelection,
-  onDelete,
-  onDownload,
+  onDeleteSelected,
+  onDownloadSelected,
 }: BulkActionToolbarProps) {
-  if (selectedCount === 0) return null;
 
   return (
-    <div className="flex items-center gap-4 px-6 py-3 border-b bg-blue-50">
+    <div className="flex rounded-full mt-6 items-center gap-4 px-2 py-2 border-b bg-[#f0f4f9]">
       <Button
         variant="ghost"
         size="icon"
@@ -27,13 +26,13 @@ export function BulkActionToolbar({
         <X className="w-5 h-5" />
       </Button>
       
-      <span className="text-sm font-medium">{selectedCount} selected</span>
+      <span className="text-sm font-medium">{selectionCount} selected</span>
 
       <div className="flex items-center gap-1 ml-4">
         <Button
           variant="ghost"
           size="icon"
-          onClick={onDownload}
+          // onClick={onDownload}
           title="Download"
         >
           <Download className="w-5 h-5" />
@@ -58,7 +57,7 @@ export function BulkActionToolbar({
         <Button
           variant="ghost"
           size="icon"
-          onClick={onDelete}
+          onClick={onDeleteSelected}
           title="Delete"
         >
           <Trash2 className="w-5 h-5" />

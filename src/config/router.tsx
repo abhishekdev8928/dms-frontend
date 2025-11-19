@@ -4,12 +4,14 @@ import DepartmentPage from "../pages/Dashboard/DepartmentPage";
 import FileVersionHistory from "@/components/custom/FileVersionHistroy";
 import LoginPage from "@/pages/Auth/LoginPage";
 import OTPPage from "@/pages/Auth/VerifyOtpPage";
+import Resetpassword from "@/pages/Auth/ResetPasswordPage";
 import AuthLayout from "@/components/layout/AuthLayout";
 import TrashScreen from "@/pages/Dashboard/RestorePage";
 import DashboardLayout from "../components/layout/DasboardLayout";
 import HomePage from "@/pages/Dashboard/HomePage";
 import RightPanelView from "@/pages/Dashboard/RightPanelPage";
 import NotFoundPage from "@/pages/Common/NotFoundPage";
+import  ForgetPasswordPage  from "@/pages/Auth/ForgotPasswordPage";
 
 export const router = createBrowserRouter([
   // ================================
@@ -68,6 +70,14 @@ export const router = createBrowserRouter([
       {
         path: "verify-otp",
         element: <OTPPage />,
+      },
+      {
+        path: "forget-password",
+        element: <ForgetPasswordPage/>,
+      },
+      {
+        path: "reset-password",
+        element: <Resetpassword/>,
       },
       {
         index: true,
