@@ -361,7 +361,7 @@ export const LeftPanelView = () => {
       <div key={node.id} className="select-none">
         <div
           onClick={() => handleRowClick(node)}
-          className={`flex items-center gap-2 py-0 px-3 rounded-lg cursor-pointer transition-all hover:text-primary ${
+          className={`flex items-center gap-2 py-2 px-3 rounded-lg cursor-pointer transition-all hover:text-primary ${
             isActive ? "bg-muted text-primary" : "text-muted-foreground"
           }`}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
@@ -376,27 +376,13 @@ export const LeftPanelView = () => {
             <span className="w-4 h-4" />
           )}
           {level === 0 ? (
-            // <BookOpen className="w-4 h-4" />
-            <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M1 18.5V3.5C1 2.83696 1.26339 2.20107 1.73223 1.73223C2.20107 1.26339 2.83696 1 3.5 1H16C16.2652 1 16.5196 1.10536 16.7071 1.29289C16.8946 1.48043 17 1.73478 17 2V20C17 20.2652 16.8946 20.5196 16.7071 20.7071C16.5196 20.8946 16.2652 21 16 21H3.5C2.83696 21 2.20107 20.7366 1.73223 20.2678C1.26339 19.7989 1 19.163 1 18.5ZM1 18.5C1 17.837 1.26339 17.2011 1.73223 16.7322C2.20107 16.2634 2.83696 16 3.5 16H17" stroke="#434343" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-
-           
+            <BookOpen className="w-4 h-4" />
           ) : isExpanded ? (
-            <svg width="22" height="19" viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 18C19.5304 18 20.0391 17.7893 20.4142 17.4142C20.7893 17.0391 21 16.5304 21 16V6C21 5.46957 20.7893 4.96086 20.4142 4.58579C20.0391 4.21071 19.5304 4 19 4H11.1C10.7655 4.00328 10.4355 3.92261 10.1403 3.76538C9.84505 3.60815 9.59396 3.37938 9.41 3.1L8.6 1.9C8.41789 1.62347 8.16997 1.39648 7.8785 1.2394C7.58702 1.08231 7.26111 1.00005 6.93 1H3C2.46957 1 1.96086 1.21071 1.58579 1.58579C1.21071 1.96086 1 2.46957 1 3V16C1 16.5304 1.21071 17.0391 1.58579 17.4142C1.96086 17.7893 2.46957 18 3 18H19Z" fill="#434343" stroke="#434343" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-
-            // <FolderOpen className="w-4 h-4" />
+            <FolderOpen className="w-4 h-4" />
           ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 14L7.5 11.1C7.66307 10.7761 7.91112 10.5027 8.21761 10.3089C8.5241 10.1152 8.8775 10.0084 9.24 9.99997H20M20 9.99997C20.3055 9.99944 20.6071 10.0689 20.8816 10.2031C21.1561 10.3372 21.3963 10.5325 21.5836 10.7738C21.7709 11.0152 21.9004 11.2963 21.9622 11.5955C22.024 11.8947 22.0164 12.2041 21.94 12.5L20.4 18.5C20.2886 18.9315 20.0362 19.3135 19.6829 19.5853C19.3296 19.857 18.8957 20.003 18.45 20H4C3.46957 20 2.96086 19.7893 2.58579 19.4142C2.21071 19.0391 2 18.5304 2 18V4.99997C2 4.46954 2.21071 3.96083 2.58579 3.58576C2.96086 3.21069 3.46957 2.99997 4 2.99997H7.9C8.23449 2.99669 8.56445 3.07736 8.8597 3.23459C9.15495 3.39183 9.40604 3.6206 9.59 3.89997L10.4 5.09997C10.5821 5.3765 10.83 5.60349 11.1215 5.76058C11.413 5.91766 11.7389 5.99992 12.07 5.99997H18C18.5304 5.99997 19.0391 6.21069 19.4142 6.58576C19.7893 6.96083 20 7.46954 20 7.99997V9.99997Z" stroke="#434343" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-
-            // <Folder className="w-4 h-4" />  
+            <Folder className="w-4 h-4" />
           )}
-          <span className="flex-1 text-sm truncate flex items-center text-[16px] text-[#1E1E1E] gap-3 rounded-lg px-3 py-2  transition-all hover:text-primary">
-          
+          <span className="flex-1 text-sm truncate">
             {node.name}
           </span>
         </div>
@@ -436,28 +422,22 @@ export const LeftPanelView = () => {
       />
 
       <div className="hidden border-r bg-muted/40 md:block">
-        <div className="flex mt-5 h-full max-h-screen flex-col gap-2">
+        <div className="flex h-full max-h-screen flex-col gap-2">
           {/* Header */}
-          <div className="flex h-14 items-center px-4 lg:h-[60px] lg:px-6">
+          <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link to="/" className="flex items-center gap-2 font-semibold">
-             <svg width="36" height="31" viewBox="0 0 36 31" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M4.33333 29.3333H31C31.8841 29.3333 32.7319 28.9821 33.357 28.357C33.9821 27.7319 34.3333 26.8841 34.3333 26V9.33333C34.3333 8.44928 33.9821 7.60143 33.357 6.97631C32.7319 6.35119 31.8841 6 31 6H17.7833C17.2343 5.99716 16.6945 5.85875 16.2118 5.59707C15.7292 5.33539 15.3186 4.95854 15.0167 4.5L13.65 2.5C13.348 2.04146 12.9375 1.66461 12.4548 1.40293C11.9722 1.14125 11.4324 1.00284 10.8833 1H4.33333C3.44928 1 2.60143 1.35119 1.97631 1.97631C1.35119 2.60143 1 3.44928 1 4.33333V26C1 27.8333 2.5 29.3333 4.33333 29.3333Z" fill="#035C4C"/>
-              <path d="M11 12.6667V19.3333V12.6667Z" fill="#035C4C"/>
-              <path d="M17.6667 12.6667V16V12.6667Z" fill="#035C4C"/>
-              <path d="M24.3333 12.6667V22.6667V12.6667Z" fill="#035C4C"/>
-              <path d="M11 12.6667V19.3333M17.6667 12.6667V16M24.3333 12.6667V22.6667M4.33333 29.3333H31C31.8841 29.3333 32.7319 28.9821 33.357 28.357C33.9821 27.7319 34.3333 26.8841 34.3333 26V9.33333C34.3333 8.44928 33.9821 7.60143 33.357 6.97631C32.7319 6.35119 31.8841 6 31 6H17.7833C17.2343 5.99716 16.6945 5.85875 16.2118 5.59707C15.7292 5.33539 15.3186 4.95854 15.0167 4.5L13.65 2.5C13.348 2.04146 12.9375 1.66461 12.4548 1.40293C11.9722 1.14125 11.4324 1.00284 10.8833 1H4.33333C3.44928 1 2.60143 1.35119 1.97631 1.97631C1.35119 2.60143 1 3.44928 1 4.33333V26C1 27.8333 2.5 29.3333 4.33333 29.3333Z" stroke="#035C4C" stroke-width="2" stroke-linecap="square" stroke-linejoin="round"/>
-              </svg>
-              <span className="text-[24px]">DMS</span>
+              <Package2 className="h-6 w-6" />
+              <span>DMS</span>
             </Link>
           </div>
 
           {/* New Button with Dropdown */}
-          <div className="px-4 border-b mb-6 pb-6 lg:px-6 py-2">
+          <div className="px-4 lg:px-6 py-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="shadow-[0px_4px_4px_0px_#035C4C40] text-[20px] h-[50px] w-[127px] justify-center gap-2"
+                  className="w-full justify-start gap-2"
                   disabled={fileUploadMutation.isPending || folderUploadMutation.isPending}
                 >
                   {(fileUploadMutation.isPending || folderUploadMutation.isPending) ? (
@@ -471,29 +451,6 @@ export const LeftPanelView = () => {
 
               <DropdownMenuContent align="start" className="w-[240px]">
                 <DropdownMenuItem
-                  className="py-2 cursor-pointer"
-                  onClick={() => setIsDeptModalOpen(true)}
-                >
-                  <LucideBuilding2 className="w-4 h-4 mr-2 text-gray-600" />
-                  <div className="flex-1">
-                    <div className="text-sm">Create Department</div>
-                  </div>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""}`}
-                  onClick={handleOpenFolderModal}
-                  disabled={!parentId}
-                >
-                  <Folder className="w-4 h-4 mr-2 text-gray-600" />
-                  <div className="flex-1">
-                    <div className="text-sm">Create Folder</div>
-                  </div>
-                </DropdownMenuItem>
-
-                <div className="h-px bg-gray-200 my-1" />
-
-                <DropdownMenuItem
                   className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""}`}
                   onClick={handleFileUploadClick}
                   disabled={fileUploadMutation.isPending || !parentId}
@@ -503,7 +460,6 @@ export const LeftPanelView = () => {
                     <div className="text-sm">File Upload</div>
                   </div>
                 </DropdownMenuItem>
-
                 <DropdownMenuItem
                   className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""}`}
                   onClick={handleFolderUploadClick}
@@ -514,6 +470,33 @@ export const LeftPanelView = () => {
                     <div className="text-sm">Folder Upload</div>
                   </div>
                 </DropdownMenuItem>
+                 <DropdownMenuItem
+                  className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""}`}
+                  onClick={handleOpenFolderModal}
+                  disabled={!parentId}
+                >
+                  <Folder className="w-4 h-4 mr-2 text-gray-600" />
+                  <div className="flex-1">
+                    <div className="text-sm">Create Folder</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="py-2 cursor-pointer"
+                  onClick={() => setIsDeptModalOpen(true)}
+                >
+                  <LucideBuilding2 className="w-4 h-4 mr-2 text-gray-600" />
+                  <div className="flex-1">
+                    <div className="text-sm">Create Department</div>
+                  </div>
+                </DropdownMenuItem>
+
+               
+
+               
+
+                
+
+                
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -525,54 +508,44 @@ export const LeftPanelView = () => {
               <NavLink
                 to="/dashboard/home"
                 className={({ isActive }) =>
-                  `flex items-center text-[16px] text-[#1E1E1E] gap-3 rounded-lg px-3 py-2  transition-all hover:text-primary ${
-                    isActive ? " " : ""
+                  `flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
+                    isActive ? "bg-muted text-primary" : ""
                   }`
                 }
               >
-                {/* <Home className="h-4 w-4" /> */}
-                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M13 20.0005V12.0005C13 11.7353 12.8946 11.4809 12.7071 11.2934C12.5196 11.1058 12.2652 11.0005 12 11.0005H8C7.73478 11.0005 7.48043 11.1058 7.29289 11.2934C7.10536 11.4809 7 11.7353 7 12.0005V20.0005M1 9.00048C0.99993 8.70955 1.06333 8.4221 1.18579 8.1582C1.30824 7.89429 1.4868 7.66028 1.709 7.47248L8.709 1.47248C9.06999 1.16739 9.52736 1 10 1C10.4726 1 10.93 1.16739 11.291 1.47248L18.291 7.47248C18.5132 7.66028 18.6918 7.89429 18.8142 8.1582C18.9367 8.4221 19.0001 8.70955 19 9.00048V18.0005C19 18.5309 18.7893 19.0396 18.4142 19.4147C18.0391 19.7898 17.5304 20.0005 17 20.0005H3C2.46957 20.0005 1.96086 19.7898 1.58579 19.4147C1.21071 19.0396 1 18.5309 1 18.0005V9.00048Z" stroke="#1E1E1E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-
+                <Home className="h-4 w-4" />
                 Home
               </NavLink>
 
               <NavLink
                 to="/dashboard/department"
-                className={({ isActive }) => `flex items-center text-[16px] text-[#1E1E1E] gap-3 rounded-lg px-3 py-2  transition-all hover:text-primary ${
-                    isActive ? " " : ""
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
+                    isActive ? "bg-muted text-primary" : ""
                   }`
                 }
               >
-                <svg width="22" height="20" viewBox="0 0 22 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 10H13M9 6H13M13 19V16C13 15.4696 12.7893 14.9609 12.4142 14.5858C12.0391 14.2107 11.5304 14 11 14C10.4696 14 9.96086 14.2107 9.58579 14.5858C9.21071 14.9609 9 15.4696 9 16V19M5 8H3C2.46957 8 1.96086 8.21071 1.58579 8.58579C1.21071 8.96086 1 9.46957 1 10V17C1 17.5304 1.21071 18.0391 1.58579 18.4142C1.96086 18.7893 2.46957 19 3 19H19C19.5304 19 20.0391 18.7893 20.4142 18.4142C20.7893 18.0391 21 17.5304 21 17V7C21 6.46957 20.7893 5.96086 20.4142 5.58579C20.0391 5.21071 19.5304 5 19 5H17M5 19V3C5 2.46957 5.21071 1.96086 5.58579 1.58579C5.96086 1.21071 6.46957 1 7 1H15C15.5304 1 16.0391 1.21071 16.4142 1.58579C16.7893 1.96086 17 2.46957 17 3V19" stroke="#1E1E1E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-
+                <LucideBuilding2 className="h-4 w-4" />
                 Department
               </NavLink>
 
               <NavLink
                 to="/dashboard/restore"
                 className={({ isActive }) =>
-                  `flex items-center text-[16px] text-[#1E1E1E] gap-3 rounded-lg px-3 py-2  transition-all hover:text-primary ${
-                    isActive ? " " : ""
+                  `flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
+                    isActive ? "bg-muted text-primary" : ""
                   }`
                 }
               >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 10C1 11.78 1.52784 13.5201 2.51677 15.0001C3.50571 16.4802 4.91131 17.6337 6.55585 18.3149C8.20038 18.9961 10.01 19.1743 11.7558 18.8271C13.5016 18.4798 15.1053 17.6226 16.364 16.364C17.6226 15.1053 18.4798 13.5016 18.8271 11.7558C19.1743 10.01 18.9961 8.20038 18.3149 6.55585C17.6337 4.91131 16.4802 3.50571 15.0001 2.51677C13.5201 1.52784 11.78 1 10 1C7.48395 1.00947 5.06897 1.99122 3.26 3.74L1 6M1 6V1M1 6H6M10 5V10L14 12" stroke="#1E1E1E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-
-                {/* <IconRestore className="h-4 w-4" /> */}
+                <IconRestore className="h-4 w-4" />
                 Restore
               </NavLink>
 
               {/* Departments Tree Section */}
               <div className="mt-4 pt-4 border-t">
-                {/* <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
                   Departments
-                </div> */}
+                </div>
                 {treeLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
