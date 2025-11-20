@@ -1,6 +1,5 @@
 import axios from "axios";
 import { generatePresignedUrls, createDocument } from "@/config/api/documentApi";
-import { logBulkFileUpload } from "@/config/api/activityApi";
 import { useUploadStore } from "@/config/store/uploadStore";
 import { queryClient } from "@/main";
 
@@ -11,7 +10,7 @@ export interface FileUploadOptions {
   parentId: string;
   onSuccess?: (count: number) => void;
   onError?: (error: any) => void;
-  onFileUploaded?: (fileIndex: number, totalFiles: number) => void;
+  onFileUploaded?: (fileIndex: number, totalFiles: number) => void; // NEW: Callback for each file
 }
 
 export interface FileUploadResult {
@@ -20,13 +19,6 @@ export interface FileUploadResult {
   errors?: string[];
 }
 
-interface UploadedFileInfo {
-  id: string;
-  name: string;
-  extension: string;
-  type: string;
-  size: number;
-}
 
 const getFileExtension = (file: File): string => {
   const extFromName = file.name.split(".").pop()?.toLowerCase();
@@ -42,15 +34,6 @@ const generateUniqueId = () => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
-const getFileType = (mimeType: string, extension: string): string => {
-  // Map mime types to file types
-  if (mimeType.includes('pdf')) return 'pdf';
-  if (mimeType.includes('word') || extension === 'docx' || extension === 'doc') return 'document';
-  if (mimeType.includes('sheet') || extension === 'xlsx' || extension === 'xls') return 'spreadsheet';
-  if (mimeType.includes('image')) return 'image';
-  if (mimeType.includes('zip')) return 'archive';
-  return 'file';
-};
 
 export const uploadFiles = async (
   files: File[],
@@ -68,10 +51,6 @@ export const uploadFiles = async (
 
   const { addUpload, updateProgress, setStatus } = useUploadStore.getState();
 
-  // Track uploaded files for activity logging
-  const uploadedFiles: UploadedFileInfo[] = [];
-  let successfulUploads = 0;
-
   try {
     // Step 1: Generate presigned URLs
     const filesPayload = files.map((file) => ({
@@ -85,6 +64,8 @@ export const uploadFiles = async (
     if (!Array.isArray(presignedFiles)) {
       throw new Error("Invalid presigned URL response");
     }
+
+    let successfulUploads = 0;
 
     // Step 2: Upload files to S3 and save metadata
     const uploadPromises = presignedFiles.map(async (item: any, index: number) => {
@@ -123,10 +104,9 @@ export const uploadFiles = async (
         const fileUrl = item.key;
         const extension = getFileExtension(file);
         const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-        const fileType = getFileType(file.type, extension);
 
         // Save document metadata
-        const documentResponse = await createDocument({
+        await createDocument({
           name: nameWithoutExt,
           originalName: file.name,
           parent_id: parentId,
@@ -139,15 +119,6 @@ export const uploadFiles = async (
         // Mark as completed
         setStatus(uploadId, 'Upload Complete');
         successfulUploads++;
-
-        // ✅ Store uploaded file info for activity logging
-        uploadedFiles.push({
-          id: documentResponse.data._id, // Document ID from response
-          name: file.name,
-          extension: extension,
-          type: fileType,
-          size: file.size,
-        });
 
         // ✅ IMMEDIATELY INVALIDATE QUERIES AFTER EACH FILE
         queryClient.invalidateQueries({ queryKey: ["children", parentId] });
@@ -167,35 +138,7 @@ export const uploadFiles = async (
       }
     });
 
-    // Wait for all uploads to complete
     await Promise.all(uploadPromises);
-
-    // ✅ Step 3: Log activity AFTER all files successfully uploaded
-    if (uploadedFiles.length > 0) {
-      try {
-        // ✅ NEW FORMAT: Send only parentId and files array
-        await logBulkFileUpload({
-          parentId: parentId, // Backend will fetch parent folder snapshot
-          files: uploadedFiles.map(file => ({
-            id: file.id,
-            name: file.name,
-            extension: file.extension,
-            type: file.type,
-            size: file.size,
-          })),
-        });
-
-        // Invalidate activity queries to refresh activity feed
-        queryClient.invalidateQueries({ queryKey: ["activities"] });
-        queryClient.invalidateQueries({ queryKey: ["user-activities"] });
-        queryClient.invalidateQueries({ queryKey: ["folder-activity", parentId] });
-        
-        console.log(`✅ Activity logged: ${uploadedFiles.length} files uploaded`);
-      } catch (activityError) {
-        // Log error but don't fail the upload
-        console.error('Failed to log activity:', activityError);
-      }
-    }
 
     // Final success callback
     onSuccess?.(files.length);

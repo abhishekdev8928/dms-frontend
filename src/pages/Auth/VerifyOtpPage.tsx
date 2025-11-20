@@ -1,4 +1,4 @@
-import { OTPForm } from "@/components/custom/OtpForm"
+import { OTPForm } from "@/components/auth/OtpForm"
 export default function OTPPage() {
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">

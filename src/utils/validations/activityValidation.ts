@@ -5,11 +5,135 @@ import { z } from "zod";
    ======================================================= */
 
 /**
+ * Validation for logging bulk file upload
+ */
+export const logBulkFileUploadSchema = z.object({
+  parentId: z.string().min(1, "Parent ID is required"),
+  files: z.array(
+    z.object({
+      id: z.string().optional(),
+      _id: z.string().optional(),
+      name: z.string().min(1, "File name is required"),
+      extension: z.string().optional(),
+      type: z.string().optional(),
+      size: z.number().optional(),
+    })
+  ).min(1, "At least one file is required"),
+});
+
+/**
+ * Validation for logging single file upload
+ */
+export const logFileUploadSchema = z.object({
+  file: z.object({
+    id: z.string().optional(),
+    _id: z.string().optional(),
+    name: z.string().min(1, "File name is required"),
+    extension: z.string().optional(),
+    type: z.string().optional(),
+    size: z.number().optional(),
+  }),
+  parentId: z.string().min(1, "Parent ID is required"),
+});
+
+/**
+ * Validation for logging file rename
+ */
+export const logFileRenameSchema = z.object({
+  file: z.object({
+    id: z.string().optional(),
+    _id: z.string().optional(),
+    name: z.string().optional(),
+    parent_id: z.string().optional(), // For parent folder snapshot
+  }),
+  oldName: z.string().min(1, "Old name is required"),
+  newName: z.string().min(1, "New name is required"),
+});
+
+/**
+ * Validation for logging file move
+ */
+export const logFileMoveSchema = z.object({
+  file: z.object({
+    id: z.string().optional(),
+    _id: z.string().optional(),
+    name: z.string().min(1, "File name is required"),
+    extension: z.string().optional(),
+    type: z.string().optional(),
+    path: z.string().optional(),
+  }),
+  fromParentId: z.string().min(1, "Source parent ID is required"),
+  toParentId: z.string().min(1, "Destination parent ID is required"),
+});
+
+/**
+ * Validation for logging file deletion
+ */
+export const logFileDeleteSchema = z.object({
+  file: z.object({
+    id: z.string().optional(),
+    _id: z.string().optional(),
+    name: z.string().min(1, "File name is required"),
+    extension: z.string().optional(),
+    type: z.string().optional(),
+    size: z.number().optional(),
+    parent_id: z.string().optional(), // For parent folder snapshot
+    path: z.string().optional(),
+  }),
+});
+
+/**
+ * Validation for logging folder creation
+ */
+export const logFolderCreateSchema = z.object({
+  folder: z.object({
+    id: z.string().optional(),
+    _id: z.string().optional(),
+    name: z.string().min(1, "Folder name is required"),
+    path: z.string().optional(),
+  }),
+  parentId: z.string().min(1, "Parent ID is required"),
+});
+
+/**
+ * Validation for logging folder rename
+ */
+export const logFolderRenameSchema = z.object({
+  folder: z.object({
+    id: z.string().optional(),
+    _id: z.string().optional(),
+    name: z.string().optional(),
+    parent_id: z.string().optional(), // For parent folder snapshot
+    path: z.string().optional(),
+  }),
+  oldName: z.string().min(1, "Old name is required"),
+  newName: z.string().min(1, "New name is required"),
+});
+
+/**
+ * Validation for logging bulk restore
+ */
+export const logBulkRestoreSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string().optional(),
+      _id: z.string().optional(),
+      name: z.string().min(1, "Item name is required"),
+      type: z.enum(["file", "folder"]),
+      itemType: z.enum(["file", "folder"]).optional(), // Alternative field name
+      extension: z.string().optional(),
+      size: z.number().optional(),
+      parent_id: z.string().optional(),
+      path: z.string().optional(),
+    })
+  ).min(1, "At least one item is required"),
+});
+
+/**
  * Validation for getting user's grouped activities
  */
 export const getUserActivitiesGroupedSchema = z.object({
-  userId: z.string().min(1, "User ID is required"),
-  limit: z.number().min(1).max(200).optional().default(100),
+  limit: z.coerce.number().min(1).max(200).optional().default(100),
 });
 
 /**
@@ -17,7 +141,7 @@ export const getUserActivitiesGroupedSchema = z.object({
  */
 export const getFileActivitySchema = z.object({
   fileId: z.string().min(1, "File ID is required"),
-  limit: z.number().min(1).max(100).optional().default(50),
+  limit: z.coerce.number().min(1).max(100).optional().default(50),
 });
 
 /**
@@ -25,74 +149,63 @@ export const getFileActivitySchema = z.object({
  */
 export const getFolderActivitySchema = z.object({
   folderId: z.string().min(1, "Folder ID is required"),
-  limit: z.number().min(1).max(100).optional().default(50),
+  limit: z.coerce.number().min(1).max(100).optional().default(50),
   actionType: z
     .enum([
+      "FILES_UPLOADED",
+      "FILE_UPLOADED",
+      "FILE_VERSION_UPLOADED",
+      "FILE_RENAMED",
+      "FILE_MOVED",
+      "FILE_DELETED",
+      "FILE_RESTORED",
+      "FILE_DOWNLOADED",
+      "FILE_PREVIEWED",
       "FOLDER_CREATED",
-      "FOLDER_UPDATED",
+      "FOLDER_RENAMED",
+      "FOLDER_MOVED",
       "FOLDER_DELETED",
       "FOLDER_RESTORED",
-      "FOLDER_MOVED",
-      "DOCUMENT_UPLOADED",
-      "DOCUMENT_UPDATED",
-      "DOCUMENT_DELETED",
-      "DOCUMENT_RESTORED",
-      "DOCUMENT_MOVED",
-      "DOCUMENT_DOWNLOADED",
-      "DOCUMENT_VIEWED",
-      "VERSION_CREATED",
-      "VERSION_REVERTED",
-      "TAGS_ADDED",
-      "TAGS_REMOVED",
+      "ITEMS_RESTORED",
     ])
     .optional(),
-});
-
-/**
- * Validation for getting bulk group activities
- */
-export const getBulkGroupActivitiesSchema = z.object({
-  bulkGroupId: z.string().min(1, "Bulk group ID is required"),
 });
 
 /**
  * Validation for getting recent activities
  */
 export const getRecentActivitiesSchema = z.object({
-  limit: z.number().min(1).max(100).optional().default(50),
-  page: z.number().min(1).optional().default(1),
-  userId: z.string().optional(),
+  limit: z.coerce.number().min(1).max(100).optional().default(50),
+  page: z.coerce.number().min(1).optional().default(1),
   actionType: z
     .enum([
+      "FILES_UPLOADED",
+      "FILE_UPLOADED",
+      "FILE_VERSION_UPLOADED",
+      "FILE_RENAMED",
+      "FILE_MOVED",
+      "FILE_DELETED",
+      "FILE_RESTORED",
+      "FILE_DOWNLOADED",
+      "FILE_PREVIEWED",
       "FOLDER_CREATED",
-      "FOLDER_UPDATED",
+      "FOLDER_RENAMED",
+      "FOLDER_MOVED",
       "FOLDER_DELETED",
       "FOLDER_RESTORED",
-      "FOLDER_MOVED",
-      "DOCUMENT_UPLOADED",
-      "DOCUMENT_UPDATED",
-      "DOCUMENT_DELETED",
-      "DOCUMENT_RESTORED",
-      "DOCUMENT_MOVED",
-      "DOCUMENT_DOWNLOADED",
-      "DOCUMENT_VIEWED",
-      "VERSION_CREATED",
-      "VERSION_REVERTED",
-      "TAGS_ADDED",
-      "TAGS_REMOVED",
+      "ITEMS_RESTORED",
     ])
     .optional(),
-  targetType: z.enum(["file", "folder"]).optional(),
+  targetType: z.enum(["file", "folder", "multiple"]).optional(),
 });
 
 /**
  * Validation for getting activity stats
  */
 export const getActivityStatsSchema = z.object({
-  startDate: z.string().optional(), // Backend uses new Date(startDate), not datetime
+  startDate: z.string().optional(),
   endDate: z.string().optional(),
-  userId: z.string().optional(),
-  targetType: z.enum(["file", "folder"]).optional(),
+  targetType: z.enum(["file", "folder", "multiple"]).optional(),
 });
 
 /**
@@ -101,22 +214,28 @@ export const getActivityStatsSchema = z.object({
 export const searchActivitiesSchema = z.object({
   query: z.string().optional(),
   action: z.string().optional(),
-  targetType: z.enum(["file", "folder"]).optional(),
-  userId: z.string().optional(),
+  targetType: z.enum(["file", "folder", "multiple"]).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  limit: z.number().min(1).max(100).optional().default(50),
-  page: z.number().min(1).optional().default(1),
+  limit: z.coerce.number().min(1).max(100).optional().default(50),
+  page: z.coerce.number().min(1).optional().default(1),
 });
 
 /* =======================================================
    TYPE INFERENCE
    ======================================================= */
 
+export type LogBulkFileUploadInput = z.infer<typeof logBulkFileUploadSchema>;
+export type LogFileUploadInput = z.infer<typeof logFileUploadSchema>;
+export type LogFileRenameInput = z.infer<typeof logFileRenameSchema>;
+export type LogFileMoveInput = z.infer<typeof logFileMoveSchema>;
+export type LogFileDeleteInput = z.infer<typeof logFileDeleteSchema>;
+export type LogFolderCreateInput = z.infer<typeof logFolderCreateSchema>;
+export type LogFolderRenameInput = z.infer<typeof logFolderRenameSchema>;
+export type LogBulkRestoreInput = z.infer<typeof logBulkRestoreSchema>;
 export type GetUserActivitiesGroupedInput = z.infer<typeof getUserActivitiesGroupedSchema>;
 export type GetFileActivityInput = z.infer<typeof getFileActivitySchema>;
 export type GetFolderActivityInput = z.infer<typeof getFolderActivitySchema>;
-export type GetBulkGroupActivitiesInput = z.infer<typeof getBulkGroupActivitiesSchema>;
 export type GetRecentActivitiesInput = z.infer<typeof getRecentActivitiesSchema>;
 export type GetActivityStatsInput = z.infer<typeof getActivityStatsSchema>;
 export type SearchActivitiesInput = z.infer<typeof searchActivitiesSchema>;

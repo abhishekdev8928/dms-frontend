@@ -28,17 +28,24 @@ import type { FileItem } from '@/types/fileSystem';
 
 interface GridViewProps {
   items: FileItem[];
+  selectedIds: {
+    fileIds: string[];
+    folderIds: string[];
+  };
+  onSelectItem: (e: React.MouseEvent<HTMLDivElement, MouseEvent>, item: { id: string; type: string }) => void;
   onItemClick: (item: FileItem) => void;
   onRename: (item: FileItem) => void;
   onDelete: (item: FileItem) => void;
   onDownload: (item: FileItem) => void;
-  onShowInfo: (fileId: string) => void;
+  onShowInfo: (item: FileItem) => void;
   onAddTags: (item: FileItem) => void;
   onReupload: (documentId: string) => void;
 }
 
 export default function GridView({
   items,
+  selectedIds,
+  onSelectItem,
   onItemClick,
   onRename,
   onDelete,
@@ -73,14 +80,25 @@ export default function GridView({
     return item.name;
   };
 
+  const isItemSelected = (item: FileItem): boolean => {
+    return item.type === "folder"
+      ? selectedIds.folderIds.includes(item._id)
+      : selectedIds.fileIds.includes(item._id);
+  };
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-4">
       {items.map((item: FileItem) => {
+        const isSelected = isItemSelected(item);
+        
         return (
           <div
             key={item._id}
-            className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden border border-gray-100"
-            onClick={() => onItemClick(item)}
+            className={`bg-white rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden border ${
+              isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-100'
+            }`}
+            onClick={(e) => onSelectItem(e, { id: item._id, type: item.type })}
+            onDoubleClick={() => onItemClick(item)}
           >
             {/* Header with icon, name, and menu */}
             <div className="px-3 py-2.5 flex items-center gap-2 border-b bg-gray-50 border-gray-100">
@@ -125,7 +143,7 @@ export default function GridView({
 
                       <DropdownMenuItem onClick={(e) => {
                         e.stopPropagation();
-                        onShowInfo(item._id);
+                        onShowInfo(item);
                       }}>
                         <Eye className="w-4 h-4 mr-2" /> View Details
                       </DropdownMenuItem>

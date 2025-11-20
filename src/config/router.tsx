@@ -72,7 +72,7 @@ export const router = createBrowserRouter([
         element: <OTPPage />,
       },
       {
-        path: "forget-password",
+        path: "forgot-password",
         element: <ForgetPasswordPage/>,
       },
       {

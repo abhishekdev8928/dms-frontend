@@ -1,35 +1,24 @@
-
-import {  Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import TopHeader from "../custom/TopHeader";
-
 import { LeftPanelView } from "../tree/LeftPanelView";
 import { useIsAuthenticated } from "@/config/store/authStore";
 import { useUploadWarning } from '@/config/store/uploadStore';
 
 const DashboardLayout = () => {
-  useUploadWarning(); // Add this line
-
+  useUploadWarning();
   const isAuthenticated = useIsAuthenticated();
 
-  // 🧩 If user is logged in → redirect to dashboard
   if (!isAuthenticated) {
     return <Navigate to="/auth/login" replace />;
   }
-  
-
- 
-
-  
 
   return (
-    <div className="grid bg-[#F5F5F5] min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-      
-
+    <div className="grid bg-[#F5F5F5] h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] overflow-hidden">
       <LeftPanelView />
-      <div className="flex flex-col ">
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          <TopHeader />
-          <Outlet  />
+      <div className="flex flex-col h-screen overflow-hidden">
+        <TopHeader />
+        <main className="flex-1 overflow-hidden px-6">
+          <Outlet />
         </main>
       </div>
     </div>

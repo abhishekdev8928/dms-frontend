@@ -21,7 +21,8 @@ export const useDocumentMutations = (
   parentId?: string,
   selectedFileId?: string | null,
   reuploadDocumentId?: string | null,
-  setReuploadDocumentId?: (id: string | null) => void
+  setReuploadDocumentId?: (id: string | null) => void,
+  
 ) => {
   const queryClient = useQueryClient();
 
@@ -99,13 +100,63 @@ export const useDocumentMutations = (
     },
   });
 
-
-   const bulkDeletionMutation = useMutation({
+ const bulkDeletionMutation = useMutation({
   mutationFn: (data: { fileIds: string[]; folderIds: string[] }) =>
     bulkDeleteion(data),
-  onSuccess: (res) => console.log(res),
-  onError: (error) => console.log(error),
+
+  onSuccess: (res) => {
+    // 🔹 Invalidate all relevant queries
+    queryClient.invalidateQueries({ queryKey: ["children"] });
+    queryClient.invalidateQueries({ queryKey: ["children", parentId] });
+
+    // 🔹 Invalidate selected document query if deleted
+    if (
+      selectedFileId &&
+      res.data?.results?.files?.deleted?.some((f: any) => f.id === selectedFileId)
+    ) {
+      queryClient.invalidateQueries({ queryKey: ["document", selectedFileId] });
+    }
+
+    // 🔥 Correct summary path
+    const summary = res?.data?.summary || { deleted: 0, failed: 0 };
+    const deleted = summary.deleted;
+    const failed = summary.failed;
+
+    // 🔥 Toast messages
+    if (deleted > 0) {
+      toast.success(
+        `${deleted} item${deleted !== 1 ? "s" : ""} moved to trash`,
+        {
+          description: "You can restore them from trash",
+        }
+      );
+      
+     
+    }
+
+    if (failed > 0) {
+      toast.info(
+        `${failed} item${failed !== 1 ? "s" : ""} failed to delete`,
+        {
+          description: "Check errors & retry",
+        }
+      );
+    }
+  },
+
+  onError: (error: any) => {
+    toast.error("Failed to move items to trash", {
+      description: error?.response?.data?.message || "Unexpected error",
+    });
+  },
 });
 
-  return { reuploadMutation,bulkDeletionMutation, updateDocumentMutation, deleteDocumentMutation, addTagsMutation };
+
+  return {
+    reuploadMutation,
+    bulkDeletionMutation,
+    updateDocumentMutation,
+    deleteDocumentMutation,
+    addTagsMutation,
+  };
 };

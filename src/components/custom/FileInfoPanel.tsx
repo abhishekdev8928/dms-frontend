@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, FolderIcon, FileText, Upload, Edit, Trash, Download, RotateCcw } from 'lucide-react';
+import { X, FolderIcon, FileText } from 'lucide-react';
 import { useState } from 'react';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { getDocumentById } from '@/config/api/documentApi';
 import { getFolderById } from '@/config/api/folderApi';
 import { getFileActivity, getFolderActivity } from '@/config/api/activityApi';
@@ -10,44 +12,46 @@ import type { FileItem } from '@/types/fileSystem';
 import type { Activity } from '@/config/api/activityApi';
 
 interface FileInfoPanelProps {
-  item: FileItem;
+  item: FileItem | null;
+  selectionCount: number;
   onClose: () => void;
 }
 
-export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
+export default function FileInfoPanel({ item, selectionCount, onClose }: FileInfoPanelProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details');
   
-  const itemType = item.type === 'folder' ? 'folder' : 'file';
+  // ALWAYS CALL HOOKS AT THE TOP LEVEL - BEFORE ANY CONDITIONAL LOGIC
+  const itemType = item?.type === 'folder' ? 'folder' : 'file';
 
   // Fetch detailed document data (only if file)
   const { data: documentData, isLoading: isLoadingDoc } = useQuery({
-    queryKey: ['document', item._id],
-    queryFn: () => getDocumentById(item._id),
-    enabled: itemType === 'file',
+    queryKey: ['document', item?._id],
+    queryFn: () => item ? getDocumentById(item._id) : Promise.resolve(null),
+    enabled: !!item && itemType === 'file',
     staleTime: 30000,
   });
 
   // Fetch detailed folder data (only if folder)
   const { data: folderData, isLoading: isLoadingFolder } = useQuery({
-    queryKey: ['folder', item._id],
-    queryFn: () => getFolderById(item._id),
-    enabled: itemType === 'folder',
+    queryKey: ['folder', item?._id],
+    queryFn: () => item ? getFolderById(item._id) : Promise.resolve(null),
+    enabled: !!item && itemType === 'folder',
     staleTime: 30000,
   });
 
   // Fetch file activity
   const { data: fileActivityData, isLoading: isLoadingFileActivity } = useQuery({
-    queryKey: ['fileActivity', item._id],
-    queryFn: () => getFileActivity({ fileId: item._id, limit: 50 }),
-    enabled: activeTab === 'activity' && itemType === 'file',
+    queryKey: ['fileActivity', item?._id],
+    queryFn: () => item ? getFileActivity({ fileId: item._id, limit: 50 }) : Promise.resolve(null),
+    enabled: !!item && activeTab === 'activity' && itemType === 'file',
     staleTime: 30000,
   });
 
   // Fetch folder activity
   const { data: folderActivityData, isLoading: isLoadingFolderActivity } = useQuery({
-    queryKey: ['folderActivity', item._id],
-    queryFn: () => getFolderActivity({ folderId: item._id, limit: 50 }),
-    enabled: activeTab === 'activity' && itemType === 'folder',
+    queryKey: ['folderActivity', item?._id],
+    queryFn: () => item ? getFolderActivity({ folderId: item._id, limit: 50 }) : Promise.resolve(null),
+    enabled: !!item && activeTab === 'activity' && itemType === 'folder',
     staleTime: 30000,
   });
 
@@ -59,8 +63,123 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
     : (folderData?.data || folderData || item);
 
   const activityData = itemType === 'file' ? fileActivityData : folderActivityData;
-  const activities = activityData?.data?.activities || [];
+  const activities = activityData?.data || [];
 
+  // NOW you can have conditional returns
+  // Show empty state for multiple selections
+  if (selectionCount > 1) {
+    return (
+      <div className="w-[350px] pb-6 rounded-[16px] bg-white h-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <h2 className="text-base font-normal text-gray-900">{selectionCount} items selected</h2>
+          </div>
+          <button 
+            onClick={onClose}
+            className="ml-2 p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+          >
+            <X className="w-5 h-5 text-gray-700" />
+          </button>
+        </div>
+
+        {/* Empty state illustration */}
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="mb-6 flex justify-center">
+              <svg width="200" height="180" viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Hand illustration */}
+                <path d="M150 120C150 120 160 100 165 95C170 90 180 85 185 90C190 95 185 105 180 110L160 130C155 135 145 140 140 140H100C95 140 90 135 90 130V80" stroke="#F59E0B" strokeWidth="3" fill="none"/>
+                
+                {/* Files */}
+                <rect x="60" y="50" width="50" height="60" rx="4" fill="#93C5FD" stroke="#3B82F6" strokeWidth="2"/>
+                <rect x="70" y="60" width="30" height="3" rx="1.5" fill="#3B82F6"/>
+                <rect x="70" y="68" width="25" height="3" rx="1.5" fill="#3B82F6"/>
+                
+                <rect x="120" y="40" width="40" height="50" rx="4" fill="#FCA5A5" stroke="#EF4444" strokeWidth="2"/>
+                <rect x="128" y="48" width="24" height="3" rx="1.5" fill="#EF4444"/>
+                <rect x="128" y="55" width="20" height="3" rx="1.5" fill="#EF4444"/>
+                
+                {/* Green dot */}
+                <circle cx="85" cy="120" r="12" fill="#FDE047"/>
+                <circle cx="90" cy="130" r="15" fill="#86EFAC"/>
+                
+                {/* Checkmark */}
+                <circle cx="35" cy="45" r="20" fill="#14B8A6"/>
+                <path d="M28 45L33 50L43 40" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <p className="text-base text-gray-600">Select an item to see the details</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state for no selection
+  if (!item) {
+    return (
+      <div className="w-[360px] rounded-[16px] bg-white  h-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <h2 className="text-base font-normal text-gray-900">My Drive</h2>
+          </div>
+          <button 
+            onClick={onClose}
+            className="ml-2 p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+          >
+            <X className="w-5 h-5 text-gray-700" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 bg-white">
+          <button
+            className="flex-1 px-6 py-3 text-base font-medium text-blue-600 relative"
+          >
+            Details
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+          </button>
+          <button
+            className="flex-1 px-6 py-3 text-base font-medium text-gray-600"
+          >
+            Activity
+          </button>
+        </div>
+
+        {/* Empty state illustration */}
+        <div className="flex-1 flex items-center justify-center p-8 ">
+          <div className="text-center">
+            <div className="mb-6 flex justify-center">
+              <svg width="200" height="180" viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Magnifying glass */}
+                <circle cx="80" cy="80" r="35" stroke="#F59E0B" strokeWidth="6" fill="none"/>
+                <line x1="105" y1="105" x2="130" y2="130" stroke="#F59E0B" strokeWidth="6" strokeLinecap="round"/>
+                
+                {/* Document */}
+                <rect x="130" y="50" width="50" height="65" rx="4" fill="#DBEAFE" stroke="#3B82F6" strokeWidth="2"/>
+                <line x1="140" y1="65" x2="170" y2="65" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="140" y1="75" x2="165" y2="75" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="140" y1="85" x2="170" y2="85" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
+                
+                {/* Curved arrow */}
+                <path d="M50 120 Q60 140 80 135" stroke="#9CA3AF" strokeWidth="3" fill="none" strokeLinecap="round"/>
+                <polygon points="82,140 85,133 77,133" fill="#9CA3AF"/>
+                
+                {/* Small decorative elements */}
+                <circle cx="160" cy="140" r="8" fill="#FCA5A5"/>
+                <rect x="30" y="55" width="20" height="20" rx="2" fill="#D1FAE5" stroke="#10B981" strokeWidth="2"/>
+              </svg>
+            </div>
+            <p className="text-base text-gray-600">Select an item to see the details</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Rest of your component logic for when we have a single item selected
   const formatDate = (dateString: string | Date) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
@@ -136,6 +255,10 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
       );
     }
     
+    // ... rest of your existing component logic
+    // Continue with the rest of your component as before
+    // [The rest of your component code remains the same...]
+    
     if (detailedItem?.extension === 'xlsx' || detailedItem?.extension === 'xls') {
       return (
         <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center text-white text-xs font-bold">
@@ -167,23 +290,44 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
     );
   };
 
-  const getActionIcon = (action: string) => {
-    if (action.includes('CREATED') || action.includes('UPLOADED')) {
-      return <Upload className="w-4 h-4 text-green-600" />;
+  const getItemIcon = (extension?: string, itemType?: 'file' | 'folder') => {
+    if (itemType === 'folder') {
+      return <FolderIcon className="w-5 h-5 text-gray-500" />;
     }
-    if (action.includes('UPDATED') || action.includes('RENAMED') || action.includes('MOVED')) {
-      return <Edit className="w-4 h-4 text-blue-600" />;
+    
+    if (extension === 'xlsx' || extension === 'xls') {
+      return (
+        <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center text-white text-[10px] font-bold">
+          X
+        </div>
+      );
     }
-    if (action.includes('DELETED')) {
-      return <Trash className="w-4 h-4 text-red-600" />;
+    
+    if (extension === 'doc' || extension === 'docx') {
+      return (
+        <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center text-white text-[10px] font-bold">
+          W
+        </div>
+      );
     }
-    if (action.includes('RESTORED')) {
-      return <RotateCcw className="w-4 h-4 text-green-600" />;
+    
+    if (extension === 'pdf') {
+      return (
+        <div className="w-5 h-5 bg-red-500 rounded flex items-center justify-center text-white text-[10px] font-bold">
+          P
+        </div>
+      );
     }
-    if (action.includes('DOWNLOADED')) {
-      return <Download className="w-4 h-4 text-purple-600" />;
+
+    if (extension === 'png' || extension === 'jpg' || extension === 'jpeg' || extension === 'gif') {
+      return (
+        <div className="w-5 h-5 bg-red-400 rounded flex items-center justify-center text-white text-[10px]">
+          📷
+        </div>
+      );
     }
-    return <FileText className="w-4 h-4 text-gray-600" />;
+    
+    return <FileText className="w-5 h-5 text-gray-500" />;
   };
 
   const renderPreview = () => {
@@ -243,7 +387,7 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
     <div className="bg-white">
       {renderPreview()}
 
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div className="px-6 py-4 rounded-[16px]">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-normal text-gray-900">Who has access</h3>
         </div>
@@ -336,10 +480,186 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
     </div>
   );
 
+  const groupActivitiesByDate = (activities: Activity[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    const lastMonth = new Date(today);
+    lastMonth.setDate(lastMonth.getDate() - 30);
+
+    const grouped: { [key: string]: Activity[] } = {
+      Today: [],
+      'Last week': [],
+      'This month': [],
+      Older: []
+    };
+
+    activities.forEach((activity) => {
+      const activityDate = new Date(activity.createdAt);
+      const activityDay = new Date(activityDate.getFullYear(), activityDate.getMonth(), activityDate.getDate());
+
+      if (activityDay.getTime() === today.getTime()) {
+        grouped['Today'].push(activity);
+      } else if (activityDay.getTime() >= lastWeek.getTime()) {
+        grouped['Last week'].push(activity);
+      } else if (activityDay.getTime() >= lastMonth.getTime()) {
+        grouped['This month'].push(activity);
+      } else {
+        grouped['Older'].push(activity);
+      }
+    });
+
+    // Filter out empty groups
+    return Object.entries(grouped).filter(([_, acts]) => acts.length > 0);
+  };
+
+  const renderActivityItem = (activity: Activity) => {
+    const isBulkOperation = activity.targetType === 'multiple' || activity.bulkOperation;
+
+    // Determine items to display
+    let itemsToShow: Array<{ name: string; extension?: string; type: 'file' | 'folder' }> = [];
+
+    if (isBulkOperation && activity.bulkOperation?.items) {
+      // Show actual items from bulk operation
+      itemsToShow = activity.bulkOperation.items.map(item => ({
+        name: item.name,
+        extension: item.extension,
+        type: item.type as 'file' | 'folder'
+      }));
+    } else if (activity.target?.name) {
+      // Single item operation
+      itemsToShow = [{
+        name: activity.target.name,
+        extension: activity.target.name?.split('.').pop(),
+        type: activity.targetType === 'folder' ? 'folder' : 'file'
+      }];
+    }
+
+    // For rename operations, show old and new name
+    const isRename = activity.action.includes('RENAMED');
+    const oldName = activity.target?.oldName;
+    const newName = activity.target?.newName;
+
+    // For move operations, show destination folder
+    const isMove = activity.action.includes('MOVED');
+    const destinationFolder = activity.parentFolder;
+
+    // Get parent folder for uploads/creates
+    const parentFolder = activity.parentFolder;
+
+    return (
+      <div key={activity._id} className="mb-7 px-6">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium flex-shrink-0">
+            {getUserInitials(activity.user || activity.userSnapshot)}
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] leading-relaxed text-gray-900 mb-1.5">
+              {activity.message}
+            </p>
+            <p className="text-[13px] text-gray-500 mb-4">
+              {activity.formattedTime}
+            </p>
+
+            {/* Parent folder - show first for uploads/creates */}
+            {(activity.action.includes('CREATED') || activity.action.includes('UPLOADED')) && parentFolder && (
+              <div className="mb-2.5">
+                <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal">
+                  <FolderIcon className="w-[18px] h-[18px] text-gray-600 mr-2.5" />
+                  <span className="text-[14px] text-gray-900">{parentFolder.name}</span>
+                </Badge>
+              </div>
+            )}
+
+            {/* Show affected items with tree structure for bulk operations */}
+            {isRename && oldName && newName ? (
+              <div className="space-y-2">
+                <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal">
+                  {getItemIcon(newName.split('.').pop(), 'file')}
+                  <span className="text-[14px] text-gray-900 ml-2.5">{newName}</span>
+                </Badge>
+                <div className="mt-2 pl-1">
+                  <span className="text-[13px] text-gray-500 line-through">{oldName}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-0">
+                {itemsToShow.map((item, idx) => {
+                  const isLast = idx === itemsToShow.length - 1;
+                  const showConnector = isBulkOperation && parentFolder;
+                  
+                  return (
+                    <div key={idx} className="flex items-center">
+                      {/* Tree structure connector */}
+                      {showConnector && (
+                        <div className="relative mr-3.5" style={{ width: '16px', height: '44px' }}>
+                          <div 
+                            className="absolute bg-gray-300" 
+                            style={{
+                              left: '0',
+                              top: '0',
+                              width: '1.5px',
+                              height: isLast ? '22px' : '44px'
+                            }}
+                          />
+                          <div 
+                            className="absolute bg-gray-300 rounded-r" 
+                            style={{
+                              left: '0',
+                              top: '21px',
+                              width: '16px',
+                              height: '1.5px'
+                            }}
+                          />
+                        </div>
+                      )}
+                      
+                      <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal my-1">
+                        {getItemIcon(item.extension, item.type)}
+                        <span className="text-[14px] text-gray-900 ml-2.5">
+                          {item.name}
+                        </span>
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Show "to" folder for move operations */}
+            {isMove && destinationFolder && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-[13px] text-gray-600">to</span>
+                <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal">
+                  <FolderIcon className="w-[18px] h-[18px] text-gray-600 mr-2.5" />
+                  <span className="text-[14px] text-gray-900">{destinationFolder.name}</span>
+                </Badge>
+              </div>
+            )}
+
+            {/* Show "in" label for folder context in bulk uploads - appears after items */}
+            {isBulkOperation && (activity.action.includes('UPLOADED') || activity.action.includes('RESTORED')) && parentFolder && (
+              <div className="mt-3 flex items-start gap-2">
+                <span className="text-[13px] text-gray-600 pt-2">in</span>
+                <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal">
+                  <FolderIcon className="w-[18px] h-[18px] text-gray-600 mr-2.5" />
+                  <span className="text-[14px] text-gray-900">{parentFolder.name}</span>
+                </Badge>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderActivityTab = () => {
     if (isLoadingActivity) {
-      return (
-        <div className="flex items-center justify-center py-12">
+      return (<div className="flex items-center justify-center py-12">
           <div className="text-gray-500">Loading activity...</div>
         </div>
       );
@@ -361,103 +681,18 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
       );
     }
 
+    const groupedActivities = groupActivitiesByDate(activities);
+
     return (
       <div className="bg-white">
         <ScrollArea className="h-[calc(100vh-200px)]">
-          <div className="py-4">
-            {activities.map((activity: Activity) => {
-              // Extract relevant data from metadata
-              const metadata = activity.metadata || {};
-              const isBulkOperation = metadata.bulkGroupId && metadata.itemCount;
-              const itemCount = metadata.itemCount || 1;
-              
-              // Determine what files/folders to show
-              let itemsToShow: Array<{name: string; type: 'file' | 'folder'; extension?: string}> = [];
-              
-              if (isBulkOperation) {
-                // For bulk operations, we might need to fetch the items
-                // For now, show a generic message
-                itemsToShow = [{
-                  name: `${itemCount} items`,
-                  type: 'file'
-                }];
-              } else {
-                // Single item operation
-                const fileName = metadata.fileName || metadata.newName || detailedItem?.name;
-                if (fileName) {
-                  itemsToShow = [{
-                    name: fileName,
-                    type: activity.targetType === 'folder' ? 'folder' : 'file',
-                    extension: detailedItem?.extension
-                  }];
-                }
-              }
-
-              return (
-                <div key={activity._id} className="px-6 mb-6">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white text-base font-medium flex-shrink-0">
-                      {getUserInitials(activity.user)}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <p className="text-base text-gray-900 mb-1">
-                        {activity.message || `You ${activity.action.toLowerCase().replace(/_/g, ' ')}`}
-                      </p>
-                      <p className="text-sm text-gray-600 mb-3">
-                        {activity.formattedTime}
-                      </p>
-
-                      {/* Show affected items */}
-                      {itemsToShow.length > 0 && (
-                        <div className="space-y-2">
-                          {itemsToShow.map((item, idx) => (
-                            <div 
-                              key={idx}
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-300 rounded-full"
-                            >
-                              {item.type === 'folder' ? (
-                                <FolderIcon className="w-4 h-4 text-gray-600" />
-                              ) : item.extension === 'xlsx' || item.extension === 'xls' ? (
-                                <div className="w-4 h-4 bg-green-600 rounded flex items-center justify-center text-white text-[8px] font-bold">
-                                  X
-                                </div>
-                              ) : item.extension === 'doc' || item.extension === 'docx' ? (
-                                <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center text-white text-[8px] font-bold">
-                                  W
-                                </div>
-                              ) : item.extension === 'pdf' ? (
-                                <div className="w-4 h-4 bg-red-500 rounded flex items-center justify-center text-white text-[8px] font-bold">
-                                  P
-                                </div>
-                              ) : (
-                                <FileText className="w-4 h-4 text-gray-600" />
-                              )}
-                              <span className="text-sm font-medium text-gray-900">
-                                {item.name}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Show folder context if moved */}
-                      {metadata.folderName && activity.action.includes('MOVED') && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-sm text-gray-600">to</span>
-                          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-300 rounded-full">
-                            <FolderIcon className="w-4 h-4 text-gray-600" />
-                            <span className="text-sm font-medium text-gray-900">
-                              {metadata.folderName}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="pt-6 pb-4">
+            {groupedActivities.map(([period, periodActivities]) => (
+              <div key={period} className="mb-8">
+                <h3 className="px-6 text-[17px] font-normal text-gray-900 mb-5">{period}</h3>
+                {periodActivities.map(renderActivityItem)}
+              </div>
+            ))}
           </div>
         </ScrollArea>
       </div>
@@ -465,7 +700,7 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
   };
 
   return (
-    <div className="w-[420px] bg-white border-l border-gray-200 h-full flex flex-col">
+    <div className="w-[350px] pb-6 bg-white rounded-[16px] h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -511,7 +746,7 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="flex-1 overflow-y-auto ">
         {isLoading ? (
           <div className="flex items-center justify-center py-12 text-gray-500">
             Loading...
@@ -519,10 +754,12 @@ export default function FileInfoPanel({ item, onClose }: FileInfoPanelProps) {
         ) : (
           <>
             {activeTab === 'details' && renderDetailsTab()}
-            {activeTab === 'activity' && renderActivityTab()}
+            {/* {activeTab === 'activity' && renderActivityTab()} */}
           </>
         )}
       </div>
     </div>
   );
 }
+
+

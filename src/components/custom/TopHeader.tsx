@@ -158,7 +158,7 @@ const TopHeader = () => {
   };
 
   return (
-    <div className="w-full bg-white">
+    <div className="w-full py-4 px-6">
       <div className="max-w-7xl mx-auto ">
         {/* Top Bar with Search */}
         <div className="flex w-full justify-between gap-4">
