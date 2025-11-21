@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, FolderIcon, FileText } from 'lucide-react';
-import { useState } from 'react';
+import { X, FolderIcon, FileText, Image, Film, Music, Archive, Code, File } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { getDocumentById } from '@/config/api/documentApi';
 import { getFolderById } from '@/config/api/folderApi';
 import { getFileActivity, getFolderActivity } from '@/config/api/activityApi';
 import type { FileItem } from '@/types/fileSystem';
 import type { Activity } from '@/config/api/activityApi';
+import { getFileIcon as getFileIconType } from '@/constants/getIcons';
 
 interface FileInfoPanelProps {
   item: FileItem | null;
@@ -17,8 +17,18 @@ interface FileInfoPanelProps {
   onClose: () => void;
 }
 
+const CLOUDFRONT_BASE_URL = 'https://d1rf5tmmedb5ah.cloudfront.net';
+
 export default function FileInfoPanel({ item, selectionCount, onClose }: FileInfoPanelProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details');
+  const [previewError, setPreviewError] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(true);
+  
+  // Reset preview states when item changes
+  useEffect(() => {
+    setPreviewError(false);
+    setPreviewLoading(true);
+  }, [item?._id]);
   
   const itemType = item?.type === 'folder' ? 'folder' : 'file';
 
@@ -59,6 +69,9 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
 
   const activityData = itemType === 'file' ? fileActivityData : folderActivityData;
   const activities = activityData?.data || [];
+
+  // Get fileUrl from item or detailedItem
+  const fileUrl = item?.fileUrl || detailedItem?.fileUrl;
 
   if (selectionCount > 1) {
     return (
@@ -205,254 +218,407 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     return detailedItem?.name ? `${detailedItem.name}.${detailedItem.extension}` : 'File';
   };
 
+  const getFileTypeCategory = (ext?: string, mime?: string) => {
+    if (itemType === 'folder') return 'folder';
+    
+    const extension = ext || detailedItem?.extension?.toLowerCase();
+    const mimeType = mime || detailedItem?.mimeType?.toLowerCase();
+    
+    if (extension === 'pdf' || mimeType?.includes('pdf')) return 'pdf';
+    if (['xlsx', 'xls', 'csv'].includes(extension || '') || mimeType?.includes('spreadsheet')) return 'spreadsheet';
+    if (['doc', 'docx'].includes(extension || '') || mimeType?.includes('word') || mimeType?.includes('document')) return 'document';
+    if (['ppt', 'pptx'].includes(extension || '') || mimeType?.includes('presentation')) return 'presentation';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(extension || '') || mimeType?.includes('image')) return 'image';
+    if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv', 'webm'].includes(extension || '') || mimeType?.includes('video')) return 'video';
+    if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(extension || '') || mimeType?.includes('audio')) return 'audio';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(extension || '')) return 'archive';
+    if (['js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'html', 'css', 'json', 'xml'].includes(extension || '')) return 'code';
+    if (['txt', 'md', 'rtf'].includes(extension || '') || mimeType?.includes('text')) return 'text';
+    
+    return 'other';
+  };
+
   const getFileIcon = () => {
-    if (itemType === 'folder') {
-      return (
-        <div className="w-8 h-8 flex items-center justify-center">
-          <FolderIcon className="w-6 h-6 text-gray-600" fill="currentColor" />
-        </div>
-      );
-    }
-    
-    if (detailedItem?.extension === 'pdf' || detailedItem?.mimeType?.includes('pdf')) {
-      return (
-        <div className="w-8 h-8 bg-red-500 rounded flex items-center justify-center text-white text-xs font-bold">
-          PDF
-        </div>
-      );
-    }
-    
-    if (detailedItem?.extension === 'xlsx' || detailedItem?.extension === 'xls') {
-      return (
-        <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center text-white text-xs font-bold">
-          X
-        </div>
-      );
-    }
-
-    if (detailedItem?.extension === 'doc' || detailedItem?.extension === 'docx') {
-      return (
-        <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-bold">
-          W
-        </div>
-      );
-    }
-
-    if (detailedItem?.mimeType?.includes('image')) {
-      return (
-        <div className="w-8 h-8 bg-red-400 rounded flex items-center justify-center text-white text-xs font-bold">
-          📷
-        </div>
-      );
-    }
+    const fileType = getFileTypeCategory();
+    const iconConfig = getFileIconType(fileType);
+    const Icon = iconConfig.icon;
     
     return (
-      <div className="w-8 h-8 bg-gray-400 rounded flex items-center justify-center text-white text-xs font-bold">
-        F
+      <div className="w-8 h-8 flex items-center justify-center">
+        <Icon className="w-6 h-6" style={{ color: iconConfig.color }} />
       </div>
     );
   };
 
-  const getFileIconHelper = (extension?: string, itemType?: 'file' | 'folder') => {
-    if (itemType === 'folder') {
-      return (
-        <div className="w-5 h-5 flex items-center justify-center">
-          <FolderIcon className="w-5 h-5 text-gray-500" fill="currentColor" />
-        </div>
-      );
+  const getFileIconHelper = (extension?: string, itemTypeParam?: 'file' | 'folder') => {
+    let fileType = 'other';
+    
+    if (itemTypeParam === 'folder') {
+      fileType = 'folder';
+    } else {
+      const ext = extension?.toLowerCase();
+      
+      if (ext === 'pdf') fileType = 'pdf';
+      else if (['xlsx', 'xls', 'csv'].includes(ext || '')) fileType = 'spreadsheet';
+      else if (['doc', 'docx', 'txt'].includes(ext || '')) fileType = 'document';
+      else if (['ppt', 'pptx'].includes(ext || '')) fileType = 'presentation';
+      else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext || '')) fileType = 'image';
+      else if (['mp4', 'avi', 'mov', 'wmv', 'flv'].includes(ext || '')) fileType = 'video';
+      else if (['mp3', 'wav', 'ogg', 'flac'].includes(ext || '')) fileType = 'audio';
+      else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '')) fileType = 'zip';
+      else if (['js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'html', 'css'].includes(ext || '')) fileType = 'code';
     }
     
-    if (extension === 'xlsx' || extension === 'xls') {
-      return (
-        <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center text-white text-[10px] font-bold">
-          X
-        </div>
-      );
-    }
-    
-    if (extension === 'doc' || extension === 'docx') {
-      return (
-        <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center text-white text-[10px] font-bold">
-          W
-        </div>
-      );
-    }
-    
-    if (extension === 'pdf') {
-      return (
-        <div className="w-5 h-5 bg-red-500 rounded flex items-center justify-center text-white text-[10px] font-bold">
-          P
-        </div>
-      );
-    }
-
-    if (extension === 'zip' || extension === 'rar' || extension === '7z' || extension === 'tar' || extension === 'gz') {
-      return (
-        <div className="w-5 h-5 bg-amber-600 rounded flex items-center justify-center text-white text-[10px] font-bold">
-          Z
-        </div>
-      );
-    }
-
-    if (extension === 'png' || extension === 'jpg' || extension === 'jpeg' || extension === 'gif') {
-      return (
-        <div className="w-5 h-5 bg-red-400 rounded flex items-center justify-center text-white text-[10px]">
-          🖼️
-        </div>
-      );
-    }
+    const iconConfig = getFileIconType(fileType);
+    const Icon = iconConfig.icon;
     
     return (
-      <div className="w-5 h-5 bg-gray-400 rounded flex items-center justify-center text-white text-[10px] font-bold">
-        F
+      <div className="w-5 h-5 flex items-center justify-center">
+        <Icon className="w-4 h-4" style={{ color: iconConfig.color }} />
       </div>
     );
   };
 
+  // Build full CloudFront URL
+  const getFullPreviewUrl = () => {
+    if (!fileUrl) return null;
+    // If fileUrl already has full URL, return it
+    if (fileUrl.startsWith('http')) return fileUrl;
+    // Otherwise prepend CloudFront base URL
+    return `${CLOUDFRONT_BASE_URL}/${fileUrl}`;
+  };
+
+  // Get preview icon based on file type
+  const getPreviewIcon = (fileType: string) => {
+    const iconProps = { className: "w-16 h-16 text-gray-400" };
+    
+    switch (fileType) {
+      case 'pdf':
+        return <FileText {...iconProps} style={{ color: '#EA4335' }} />;
+      case 'document':
+        return <FileText {...iconProps} style={{ color: '#4285F4' }} />;
+      case 'spreadsheet':
+        return <FileText {...iconProps} style={{ color: '#34A853' }} />;
+      case 'presentation':
+        return <FileText {...iconProps} style={{ color: '#FBBC04' }} />;
+      case 'image':
+        return <Image {...iconProps} style={{ color: '#EA4335' }} />;
+      case 'video':
+        return <Film {...iconProps} style={{ color: '#EA4335' }} />;
+      case 'audio':
+        return <Music {...iconProps} style={{ color: '#9334E9' }} />;
+      case 'archive':
+        return <Archive {...iconProps} style={{ color: '#6B7280' }} />;
+      case 'code':
+        return <Code {...iconProps} style={{ color: '#F97316' }} />;
+      default:
+        return <File {...iconProps} />;
+    }
+  };
+
+  // Render file preview like Google Drive
   const renderPreview = () => {
     if (itemType === 'folder') {
       return (
-        <div className="px-4 py-8 flex items-center justify-center bg-white">
-          <FolderIcon className="w-40 h-40 text-gray-400" strokeWidth={1} />
+        <div className="px-4 py-6 flex items-center justify-center bg-gray-50 border-b border-gray-200">
+          <FolderIcon className="w-32 h-32 text-gray-400" strokeWidth={1} />
         </div>
       );
     }
 
-    if (detailedItem?.mimeType?.startsWith('image/')) {
+    const fullPreviewUrl = getFullPreviewUrl();
+    const fileType = getFileTypeCategory();
+
+    // For images - show direct preview with skeleton
+    if (fileType === 'image' && fullPreviewUrl && !previewError) {
       return (
-        <div className="px-4 py-4 bg-white">
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="relative w-full h-48 flex items-center justify-center overflow-hidden">
+            {previewLoading && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Skeleton className="w-full h-full rounded-none" />
+              </div>
+            )}
             <img 
-              src={detailedItem?.url || detailedItem?.path} 
-              alt={detailedItem?.name}
-              className="w-full h-auto max-h-80 object-contain"
+              src={fullPreviewUrl} 
+              alt={detailedItem?.name || 'Preview'}
+              className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
+              onLoad={() => setPreviewLoading(false)}
+              onError={() => {
+                setPreviewError(true);
+                setPreviewLoading(false);
+              }}
             />
           </div>
         </div>
       );
     }
 
-    if (detailedItem?.thumbnailUrl || detailedItem?.previewUrl) {
+    // For PDFs - show embedded preview or thumbnail with skeleton
+    if (fileType === 'pdf' && fullPreviewUrl && !previewError) {
       return (
-        <div className="px-4 py-4 bg-white">
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <img 
-              src={detailedItem.thumbnailUrl || detailedItem.previewUrl} 
-              alt={detailedItem?.name}
-              className="w-full h-auto object-contain"
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="relative w-full h-56 overflow-hidden">
+            {previewLoading && (
+              <div className="absolute inset-0">
+                <Skeleton className="w-full h-full rounded-none" />
+              </div>
+            )}
+            <iframe
+              src={`${fullPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+              className={`w-full h-full border-0 transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
+              title={detailedItem?.name || 'PDF Preview'}
+              onLoad={() => setPreviewLoading(false)}
+              onError={() => {
+                setPreviewError(true);
+                setPreviewLoading(false);
+              }}
             />
           </div>
         </div>
       );
     }
 
-    return null;
+    // For videos - show video player with skeleton
+    if (fileType === 'video' && fullPreviewUrl && !previewError) {
+      return (
+        <div className="bg-black border-b border-gray-200">
+          <div className="relative w-full h-48 flex items-center justify-center">
+            {previewLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                <Skeleton className="w-full h-full rounded-none bg-gray-700" />
+              </div>
+            )}
+            <video 
+              src={fullPreviewUrl}
+              controls
+              className={`max-w-full max-h-full transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
+              onLoadedData={() => setPreviewLoading(false)}
+              onError={() => {
+                setPreviewError(true);
+                setPreviewLoading(false);
+              }}
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </div>
+      );
+    }
+
+    // For audio - show audio player with skeleton
+    if (fileType === 'audio' && fullPreviewUrl && !previewError) {
+      return (
+        <div className="bg-gray-50 border-b border-gray-200 px-4 py-8">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <Music className="w-16 h-16 text-purple-500" />
+            {previewLoading && (
+              <Skeleton className="w-full max-w-[280px] h-12 rounded-full" />
+            )}
+            <audio 
+              src={fullPreviewUrl}
+              controls
+              className={`w-full max-w-[280px] transition-opacity duration-300 ${previewLoading ? 'opacity-0 absolute' : 'opacity-100'}`}
+              onLoadedData={() => setPreviewLoading(false)}
+              onError={() => {
+                setPreviewError(true);
+                setPreviewLoading(false);
+              }}
+            >
+              Your browser does not support the audio tag.
+            </audio>
+          </div>
+        </div>
+      );
+    }
+
+    // For documents (Word, Excel, PPT) - show Microsoft Office Online Viewer with skeleton
+    if (['document', 'spreadsheet', 'presentation'].includes(fileType) && fullPreviewUrl && !previewError) {
+      const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullPreviewUrl)}`;
+      return (
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="relative w-full h-56 overflow-hidden">
+            {previewLoading && (
+              <div className="absolute inset-0">
+                <Skeleton className="w-full h-full rounded-none" />
+              </div>
+            )}
+            <iframe
+              src={officeViewerUrl}
+              className={`w-full h-full border-0 transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
+              title={detailedItem?.name || 'Document Preview'}
+              onLoad={() => setPreviewLoading(false)}
+              onError={() => {
+                setPreviewError(true);
+                setPreviewLoading(false);
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // For text files - try to show content with skeleton
+    if (fileType === 'text' && fullPreviewUrl && !previewError) {
+      return (
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="relative w-full h-48 overflow-hidden">
+            {previewLoading && (
+              <div className="absolute inset-0 flex flex-col gap-2 p-4 bg-white">
+                <Skeleton className="w-full h-3" />
+                <Skeleton className="w-4/5 h-3" />
+                <Skeleton className="w-3/4 h-3" />
+                <Skeleton className="w-5/6 h-3" />
+                <Skeleton className="w-2/3 h-3" />
+                <Skeleton className="w-full h-3" />
+              </div>
+            )}
+            <iframe
+              src={fullPreviewUrl}
+              className={`w-full h-full border-0 bg-white transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
+              title={detailedItem?.name || 'Text Preview'}
+              onLoad={() => setPreviewLoading(false)}
+              onError={() => {
+                setPreviewError(true);
+                setPreviewLoading(false);
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Default fallback - show file type icon
+    return (
+      <div className="bg-gray-50 border-b border-gray-200 px-4 py-8">
+        <div className="flex flex-col items-center justify-center gap-3">
+          {getPreviewIcon(fileType)}
+          <span className="text-sm text-gray-500 uppercase font-medium">
+            {detailedItem?.extension || fileType}
+          </span>
+          {fullPreviewUrl && (
+            <a 
+              href={fullPreviewUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Open in new tab
+            </a>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const getFileType = () => {
     if (itemType === 'folder') return 'Folder';
     
-    if (detailedItem?.extension === 'pdf') return 'PDF';
-    if (detailedItem?.extension === 'xlsx' || detailedItem?.extension === 'xls') return 'Microsoft Excel';
-    if (detailedItem?.extension === 'doc' || detailedItem?.extension === 'docx') return 'Microsoft Word';
+    const ext = detailedItem?.extension?.toLowerCase();
+    
+    if (ext === 'pdf') return 'PDF';
+    if (ext === 'xlsx' || ext === 'xls') return 'Microsoft Excel';
+    if (ext === 'doc' || ext === 'docx') return 'Microsoft Word';
+    if (ext === 'ppt' || ext === 'pptx') return 'Microsoft PowerPoint';
+    if (ext === 'csv') return 'CSV Spreadsheet';
+    if (ext === 'txt') return 'Text File';
+    if (ext === 'zip') return 'ZIP Archive';
+    if (ext === 'rar') return 'RAR Archive';
+    if (['jpg', 'jpeg'].includes(ext || '')) return 'JPEG Image';
+    if (ext === 'png') return 'PNG Image';
+    if (ext === 'gif') return 'GIF Image';
+    if (ext === 'svg') return 'SVG Image';
+    if (ext === 'mp4') return 'MP4 Video';
+    if (ext === 'mp3') return 'MP3 Audio';
     if (detailedItem?.mimeType?.includes('spreadsheet')) return 'Spreadsheet';
     if (detailedItem?.mimeType?.includes('document')) return 'Document';
     if (detailedItem?.mimeType?.includes('image')) return 'Image';
     
-    return detailedItem?.extension?.toUpperCase() || 'File';
+    return ext?.toUpperCase() || 'File';
   };
 
   const renderDetailsTab = () => (
     <div className="bg-white">
+      {/* Preview Section at Top */}
       {renderPreview()}
 
-      <div className="px-6 py-4 rounded-[16px]">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-normal text-gray-900">Who has access</h3>
-        </div>
-        
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white text-base font-medium">
-            {getUserInitials()}
-          </div>
-          <div className="flex-1">
-            <p className="text-base text-gray-900">Private to you</p>
-          </div>
-        </div>
-
-        <button className="w-full py-2.5 px-4 border-2 border-blue-600 rounded-full text-blue-600 text-sm font-medium hover:bg-blue-50 transition-colors">
-          Manage access
-        </button>
+      {/* Who has access section */}
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-base font-medium text-gray-900 mb-2">Who has access</h3>
+        <p className="text-sm text-gray-500">You do not have permission to view sharing</p>
+        <p className="text-sm text-gray-500">information for this item</p>
       </div>
 
+      {/* Security limitations section */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-start gap-3">
-          <div className="w-6 h-6 flex items-center justify-center">
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <div className="w-6 h-6 flex items-center justify-center text-gray-600">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-normal text-gray-900 mb-1">Security limitations</h3>
-            <p className="text-base text-gray-900 font-medium mb-0.5">No limitations applied</p>
-            <p className="text-sm text-gray-600">If any are applied, they will appear here</p>
+            <h3 className="text-base font-medium text-gray-900 mb-1">Security limitations</h3>
+            <p className="text-sm text-gray-700 mb-0.5">No limitations applied</p>
+            <p className="text-xs text-gray-500">If any are applied, they will appear here</p>
           </div>
         </div>
       </div>
 
+      {/* File/Folder details section */}
       <div className="px-6 py-4">
-        <h3 className="text-lg font-normal text-gray-900 mb-4">
+        <h3 className="text-base font-medium text-gray-900 mb-4">
           {itemType === 'folder' ? 'Folder details' : 'File details'}
         </h3>
         
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div>
-            <div className="text-base font-normal text-gray-900 mb-1">Type</div>
-            <p className="text-base text-gray-700">{getFileType()}</p>
+            <div className="text-sm font-medium text-gray-700 mb-1">Type</div>
+            <p className="text-sm text-gray-600">{getFileType()}</p>
           </div>
 
           {itemType === 'file' && (
             <>
               <div>
-                <div className="text-base font-normal text-gray-900 mb-1">Size</div>
-                <p className="text-base text-gray-700">{formatSize(detailedItem?.size)}</p>
+                <div className="text-sm font-medium text-gray-700 mb-1">Size</div>
+                <p className="text-sm text-gray-600">{formatSize(detailedItem?.size)}</p>
               </div>
 
               <div>
-                <div className="text-base font-normal text-gray-900 mb-1">Storage used</div>
-                <p className="text-base text-gray-700">{formatSize(detailedItem?.size)}</p>
+                <div className="text-sm font-medium text-gray-700 mb-1">Storage used</div>
+                <p className="text-sm text-gray-600">{formatSize(detailedItem?.size)}</p>
               </div>
             </>
           )}
 
           <div>
-            <div className="text-base font-normal text-gray-900 mb-1">Owner</div>
-            <p className="text-base text-gray-700">me</p>
+            <div className="text-sm font-medium text-gray-700 mb-1">Owner</div>
+            <p className="text-sm text-gray-600">me</p>
           </div>
 
           <div>
-            <div className="text-base font-normal text-gray-900 mb-1">Modified</div>
-            <p className="text-base text-gray-700">
+            <div className="text-sm font-medium text-gray-700 mb-1">Modified</div>
+            <p className="text-sm text-gray-600">
               {detailedItem?.updatedAt ? `${formatDate(detailedItem.updatedAt)} by me` : '-'}
             </p>
           </div>
 
           <div>
-            <div className="text-base font-normal text-gray-900 mb-1">Created</div>
-            <p className="text-base text-gray-700">
+            <div className="text-sm font-medium text-gray-700 mb-1">Created</div>
+            <p className="text-sm text-gray-600">
               {detailedItem?.createdAt ? formatDate(detailedItem.createdAt) : '-'}
             </p>
           </div>
 
           <div>
-            <div className="text-base font-normal text-gray-900 mb-2">Description</div>
+            <div className="text-sm font-medium text-gray-700 mb-2">Description</div>
             <textarea
               placeholder="Add description"
-              className="w-full text-base text-gray-700 border border-gray-300 rounded-md p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full text-sm text-gray-700 border border-gray-300 rounded-md p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={3}
               defaultValue={detailedItem?.description || ''}
             />
-            <div className="text-xs text-gray-500 text-right mt-1">0/25,000</div>
+            <div className="text-xs text-gray-400 text-right mt-1">0/25,000</div>
           </div>
         </div>
       </div>
@@ -504,12 +670,12 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
         type: item.type === 'folder' ? 'folder' : 'file'
       }));
     } else if (activity.target?.name || activity.target?.folderName) {
-      const itemType = activity.targetType === 'folder' ? 'folder' : 'file';
+      const targetItemType = activity.targetType === 'folder' ? 'folder' : 'file';
       const itemName = activity.target.name || activity.target.folderName;
       itemsToShow = [{
         name: itemName,
         extension: activity.target.extension || itemName?.split('.').pop(),
-        type: itemType
+        type: targetItemType
       }];
     }
 
@@ -518,19 +684,13 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     const newName = activity.target?.newName;
 
     const isMove = activity.action.includes('MOVED');
-
     const parentFolder = activity.parentFolder;
     
-    // For FOLDER_CREATED, show parent folder first with tree structure to created folder
     const isFolderCreation = activity.action === 'FOLDER_CREATED';
     const showParentFolderFirst = isFolderCreation && parentFolder;
     
-    // For FILES_UPLOADED, show parent folder at top and uploaded files below with tree structure
     const isFileUpload = activity.action === 'FILES_UPLOADED';
     const showParentForUpload = isFileUpload && parentFolder && isBulkOperation;
-    
-    // Never show "in" context at bottom if parent is already shown at top
-    const showInContext = false;
 
     return (
       <div key={activity._id} className="mb-6">
@@ -549,7 +709,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
             </p>
 
             <div className="space-y-0">
-              {/* Show parent folder badge FIRST for folder creation and file uploads */}
               {(showParentFolderFirst || showParentForUpload) && (
                 <div className="mb-2">
                   <div className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
@@ -561,7 +720,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
                 </div>
               )}
 
-              {/* Renamed items - special layout */}
               {isRename && oldName && newName ? (
                 <>
                   <div className="mb-2">
@@ -575,17 +733,14 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
                   </div>
                 </>
               ) : (
-                /* Regular items with tree connector */
-                itemsToShow.map((item, idx) => {
+                itemsToShow.map((showItem, idx) => {
                   const isLast = idx === itemsToShow.length - 1;
                   const showConnector = (isFolderCreation || isFileUpload) && (showParentFolderFirst || showParentForUpload);
                   
                   return (
                     <div key={idx} className="flex items-center my-1.5">
-                      {/* Tree structure connector */}
                       {showConnector && (
                         <div className="relative mr-3" style={{ width: '16px', height: '36px' }}>
-                          {/* Vertical line */}
                           <div 
                             className="absolute bg-gray-300" 
                             style={{
@@ -595,7 +750,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
                               height: isLast ? '18px' : '36px'
                             }}
                           />
-                          {/* Horizontal line */}
                           <div 
                             className="absolute bg-gray-300" 
                             style={{
@@ -608,11 +762,10 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
                         </div>
                       )}
                       
-                      {/* Item badge */}
                       <div className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
-                        {getFileIconHelper(item.extension, item.type)}
+                        {getFileIconHelper(showItem.extension, showItem.type)}
                         <span className="text-[14px] text-gray-900 truncate max-w-[220px]">
-                          {item.name}
+                          {showItem.name}
                         </span>
                       </div>
                     </div>
@@ -620,20 +773,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
                 })
               )}
 
-              {/* Never show "in" context at bottom when parent folder is already shown at top */}
-              {showInContext && (
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-[13px] text-gray-600">in</span>
-                  <div className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
-                    <div className="w-5 h-5 flex items-center justify-center">
-                      <FolderIcon className="w-5 h-5 text-gray-500" fill="currentColor" />
-                    </div>
-                    <span className="text-[14px] text-gray-900">{parentFolder.name}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Show "to" folder for move operations */}
               {isMove && parentFolder && (
                 <div className="mt-3 flex items-center gap-2">
                   <span className="text-[13px] text-gray-600">to</span>
