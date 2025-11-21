@@ -20,10 +20,8 @@ interface FileInfoPanelProps {
 export default function FileInfoPanel({ item, selectionCount, onClose }: FileInfoPanelProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details');
   
-  // ALWAYS CALL HOOKS AT THE TOP LEVEL - BEFORE ANY CONDITIONAL LOGIC
   const itemType = item?.type === 'folder' ? 'folder' : 'file';
 
-  // Fetch detailed document data (only if file)
   const { data: documentData, isLoading: isLoadingDoc } = useQuery({
     queryKey: ['document', item?._id],
     queryFn: () => item ? getDocumentById(item._id) : Promise.resolve(null),
@@ -31,7 +29,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     staleTime: 30000,
   });
 
-  // Fetch detailed folder data (only if folder)
   const { data: folderData, isLoading: isLoadingFolder } = useQuery({
     queryKey: ['folder', item?._id],
     queryFn: () => item ? getFolderById(item._id) : Promise.resolve(null),
@@ -39,7 +36,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     staleTime: 30000,
   });
 
-  // Fetch file activity
   const { data: fileActivityData, isLoading: isLoadingFileActivity } = useQuery({
     queryKey: ['fileActivity', item?._id],
     queryFn: () => item ? getFileActivity({ fileId: item._id, limit: 50 }) : Promise.resolve(null),
@@ -47,7 +43,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     staleTime: 30000,
   });
 
-  // Fetch folder activity
   const { data: folderActivityData, isLoading: isLoadingFolderActivity } = useQuery({
     queryKey: ['folderActivity', item?._id],
     queryFn: () => item ? getFolderActivity({ folderId: item._id, limit: 50 }) : Promise.resolve(null),
@@ -65,12 +60,9 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
   const activityData = itemType === 'file' ? fileActivityData : folderActivityData;
   const activities = activityData?.data || [];
 
-  // NOW you can have conditional returns
-  // Show empty state for multiple selections
   if (selectionCount > 1) {
     return (
       <div className="w-[350px] pb-6 rounded-[16px] bg-white h-full flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <h2 className="text-base font-normal text-gray-900">{selectionCount} items selected</h2>
@@ -83,28 +75,19 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
           </button>
         </div>
 
-        {/* Empty state illustration */}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center">
             <div className="mb-6 flex justify-center">
               <svg width="200" height="180" viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Hand illustration */}
                 <path d="M150 120C150 120 160 100 165 95C170 90 180 85 185 90C190 95 185 105 180 110L160 130C155 135 145 140 140 140H100C95 140 90 135 90 130V80" stroke="#F59E0B" strokeWidth="3" fill="none"/>
-                
-                {/* Files */}
                 <rect x="60" y="50" width="50" height="60" rx="4" fill="#93C5FD" stroke="#3B82F6" strokeWidth="2"/>
                 <rect x="70" y="60" width="30" height="3" rx="1.5" fill="#3B82F6"/>
                 <rect x="70" y="68" width="25" height="3" rx="1.5" fill="#3B82F6"/>
-                
                 <rect x="120" y="40" width="40" height="50" rx="4" fill="#FCA5A5" stroke="#EF4444" strokeWidth="2"/>
                 <rect x="128" y="48" width="24" height="3" rx="1.5" fill="#EF4444"/>
                 <rect x="128" y="55" width="20" height="3" rx="1.5" fill="#EF4444"/>
-                
-                {/* Green dot */}
                 <circle cx="85" cy="120" r="12" fill="#FDE047"/>
                 <circle cx="90" cy="130" r="15" fill="#86EFAC"/>
-                
-                {/* Checkmark */}
                 <circle cx="35" cy="45" r="20" fill="#14B8A6"/>
                 <path d="M28 45L33 50L43 40" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -116,11 +99,9 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     );
   }
 
-  // Show empty state for no selection
   if (!item) {
     return (
-      <div className="w-[360px] rounded-[16px] bg-white  h-full flex flex-col">
-        {/* Header */}
+      <div className="w-[360px] rounded-[16px] bg-white h-full flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <h2 className="text-base font-normal text-gray-900">My Drive</h2>
@@ -133,41 +114,28 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-gray-200 bg-white">
-          <button
-            className="flex-1 px-6 py-3 text-base font-medium text-blue-600 relative"
-          >
+          <button className="flex-1 px-6 py-3 text-base font-medium text-blue-600 relative">
             Details
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
           </button>
-          <button
-            className="flex-1 px-6 py-3 text-base font-medium text-gray-600"
-          >
+          <button className="flex-1 px-6 py-3 text-base font-medium text-gray-600">
             Activity
           </button>
         </div>
 
-        {/* Empty state illustration */}
-        <div className="flex-1 flex items-center justify-center p-8 ">
+        <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center">
             <div className="mb-6 flex justify-center">
               <svg width="200" height="180" viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Magnifying glass */}
                 <circle cx="80" cy="80" r="35" stroke="#F59E0B" strokeWidth="6" fill="none"/>
                 <line x1="105" y1="105" x2="130" y2="130" stroke="#F59E0B" strokeWidth="6" strokeLinecap="round"/>
-                
-                {/* Document */}
                 <rect x="130" y="50" width="50" height="65" rx="4" fill="#DBEAFE" stroke="#3B82F6" strokeWidth="2"/>
                 <line x1="140" y1="65" x2="170" y2="65" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
                 <line x1="140" y1="75" x2="165" y2="75" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
                 <line x1="140" y1="85" x2="170" y2="85" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
-                
-                {/* Curved arrow */}
                 <path d="M50 120 Q60 140 80 135" stroke="#9CA3AF" strokeWidth="3" fill="none" strokeLinecap="round"/>
                 <polygon points="82,140 85,133 77,133" fill="#9CA3AF"/>
-                
-                {/* Small decorative elements */}
                 <circle cx="160" cy="140" r="8" fill="#FCA5A5"/>
                 <rect x="30" y="55" width="20" height="20" rx="2" fill="#D1FAE5" stroke="#10B981" strokeWidth="2"/>
               </svg>
@@ -179,7 +147,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     );
   }
 
-  // Rest of your component logic for when we have a single item selected
   const formatDate = (dateString: string | Date) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
@@ -255,10 +222,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
       );
     }
     
-    // ... rest of your existing component logic
-    // Continue with the rest of your component as before
-    // [The rest of your component code remains the same...]
-    
     if (detailedItem?.extension === 'xlsx' || detailedItem?.extension === 'xls') {
       return (
         <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center text-white text-xs font-bold">
@@ -290,9 +253,13 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     );
   };
 
-  const getItemIcon = (extension?: string, itemType?: 'file' | 'folder') => {
+  const getFileIconHelper = (extension?: string, itemType?: 'file' | 'folder') => {
     if (itemType === 'folder') {
-      return <FolderIcon className="w-5 h-5 text-gray-500" />;
+      return (
+        <div className="w-5 h-5 flex items-center justify-center">
+          <FolderIcon className="w-5 h-5 text-gray-500" fill="currentColor" />
+        </div>
+      );
     }
     
     if (extension === 'xlsx' || extension === 'xls') {
@@ -319,15 +286,27 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
       );
     }
 
+    if (extension === 'zip' || extension === 'rar' || extension === '7z' || extension === 'tar' || extension === 'gz') {
+      return (
+        <div className="w-5 h-5 bg-amber-600 rounded flex items-center justify-center text-white text-[10px] font-bold">
+          Z
+        </div>
+      );
+    }
+
     if (extension === 'png' || extension === 'jpg' || extension === 'jpeg' || extension === 'gif') {
       return (
         <div className="w-5 h-5 bg-red-400 rounded flex items-center justify-center text-white text-[10px]">
-          📷
+          🖼️
         </div>
       );
     }
     
-    return <FileText className="w-5 h-5 text-gray-500" />;
+    return (
+      <div className="w-5 h-5 bg-gray-400 rounded flex items-center justify-center text-white text-[10px] font-bold">
+        F
+      </div>
+    );
   };
 
   const renderPreview = () => {
@@ -483,8 +462,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
   const groupActivitiesByDate = (activities: Activity[]) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
     const lastWeek = new Date(today);
     lastWeek.setDate(lastWeek.getDate() - 7);
     const lastMonth = new Date(today);
@@ -512,105 +489,118 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
       }
     });
 
-    // Filter out empty groups
     return Object.entries(grouped).filter(([_, acts]) => acts.length > 0);
   };
 
   const renderActivityItem = (activity: Activity) => {
-    const isBulkOperation = activity.targetType === 'multiple' || activity.bulkOperation;
+    const isBulkOperation = activity.targetType === 'multiple' && activity.bulkOperation?.items && activity.bulkOperation.items.length > 0;
 
-    // Determine items to display
     let itemsToShow: Array<{ name: string; extension?: string; type: 'file' | 'folder' }> = [];
 
-    if (isBulkOperation && activity.bulkOperation?.items) {
-      // Show actual items from bulk operation
+    if (isBulkOperation) {
       itemsToShow = activity.bulkOperation.items.map(item => ({
         name: item.name,
         extension: item.extension,
-        type: item.type as 'file' | 'folder'
+        type: item.type === 'folder' ? 'folder' : 'file'
       }));
-    } else if (activity.target?.name) {
-      // Single item operation
+    } else if (activity.target?.name || activity.target?.folderName) {
+      const itemType = activity.targetType === 'folder' ? 'folder' : 'file';
+      const itemName = activity.target.name || activity.target.folderName;
       itemsToShow = [{
-        name: activity.target.name,
-        extension: activity.target.name?.split('.').pop(),
-        type: activity.targetType === 'folder' ? 'folder' : 'file'
+        name: itemName,
+        extension: activity.target.extension || itemName?.split('.').pop(),
+        type: itemType
       }];
     }
 
-    // For rename operations, show old and new name
     const isRename = activity.action.includes('RENAMED');
     const oldName = activity.target?.oldName;
     const newName = activity.target?.newName;
 
-    // For move operations, show destination folder
     const isMove = activity.action.includes('MOVED');
-    const destinationFolder = activity.parentFolder;
 
-    // Get parent folder for uploads/creates
     const parentFolder = activity.parentFolder;
+    
+    // For FOLDER_CREATED, show parent folder first with tree structure to created folder
+    const isFolderCreation = activity.action === 'FOLDER_CREATED';
+    const showParentFolderFirst = isFolderCreation && parentFolder;
+    
+    // For FILES_UPLOADED, show parent folder at top and uploaded files below with tree structure
+    const isFileUpload = activity.action === 'FILES_UPLOADED';
+    const showParentForUpload = isFileUpload && parentFolder && isBulkOperation;
+    
+    // Never show "in" context at bottom if parent is already shown at top
+    const showInContext = false;
 
     return (
-      <div key={activity._id} className="mb-7 px-6">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium flex-shrink-0">
+      <div key={activity._id} className="mb-6">
+        <div className="flex items-start gap-3 px-6">
+          <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium flex-shrink-0 mt-0.5">
             {getUserInitials(activity.user || activity.userSnapshot)}
           </div>
           
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] leading-relaxed text-gray-900 mb-1.5">
+            <p className="text-[15px] leading-relaxed text-gray-900 mb-1">
               {activity.message}
             </p>
-            <p className="text-[13px] text-gray-500 mb-4">
+            
+            <p className="text-[13px] text-gray-500 mb-3">
               {activity.formattedTime}
             </p>
 
-            {/* Parent folder - show first for uploads/creates */}
-            {(activity.action.includes('CREATED') || activity.action.includes('UPLOADED')) && parentFolder && (
-              <div className="mb-2.5">
-                <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal">
-                  <FolderIcon className="w-[18px] h-[18px] text-gray-600 mr-2.5" />
-                  <span className="text-[14px] text-gray-900">{parentFolder.name}</span>
-                </Badge>
-              </div>
-            )}
-
-            {/* Show affected items with tree structure for bulk operations */}
-            {isRename && oldName && newName ? (
-              <div className="space-y-2">
-                <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal">
-                  {getItemIcon(newName.split('.').pop(), 'file')}
-                  <span className="text-[14px] text-gray-900 ml-2.5">{newName}</span>
-                </Badge>
-                <div className="mt-2 pl-1">
-                  <span className="text-[13px] text-gray-500 line-through">{oldName}</span>
+            <div className="space-y-0">
+              {/* Show parent folder badge FIRST for folder creation and file uploads */}
+              {(showParentFolderFirst || showParentForUpload) && (
+                <div className="mb-2">
+                  <div className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <FolderIcon className="w-5 h-5 text-gray-500" fill="currentColor" />
+                    </div>
+                    <span className="text-[14px] text-gray-900">{parentFolder.name}</span>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-0">
-                {itemsToShow.map((item, idx) => {
+              )}
+
+              {/* Renamed items - special layout */}
+              {isRename && oldName && newName ? (
+                <>
+                  <div className="mb-2">
+                    <div className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
+                      {getFileIconHelper(newName.split('.').pop(), activity.targetType === 'folder' ? 'folder' : 'file')}
+                      <span className="text-[14px] text-gray-900">{newName}</span>
+                    </div>
+                  </div>
+                  <div className="pl-1">
+                    <span className="text-[13px] text-gray-500 line-through">{oldName}</span>
+                  </div>
+                </>
+              ) : (
+                /* Regular items with tree connector */
+                itemsToShow.map((item, idx) => {
                   const isLast = idx === itemsToShow.length - 1;
-                  const showConnector = isBulkOperation && parentFolder;
+                  const showConnector = (isFolderCreation || isFileUpload) && (showParentFolderFirst || showParentForUpload);
                   
                   return (
-                    <div key={idx} className="flex items-center">
+                    <div key={idx} className="flex items-center my-1.5">
                       {/* Tree structure connector */}
                       {showConnector && (
-                        <div className="relative mr-3.5" style={{ width: '16px', height: '44px' }}>
+                        <div className="relative mr-3" style={{ width: '16px', height: '36px' }}>
+                          {/* Vertical line */}
                           <div 
                             className="absolute bg-gray-300" 
                             style={{
                               left: '0',
                               top: '0',
                               width: '1.5px',
-                              height: isLast ? '22px' : '44px'
+                              height: isLast ? '18px' : '36px'
                             }}
                           />
+                          {/* Horizontal line */}
                           <div 
-                            className="absolute bg-gray-300 rounded-r" 
+                            className="absolute bg-gray-300" 
                             style={{
                               left: '0',
-                              top: '21px',
+                              top: '17px',
                               width: '16px',
                               height: '1.5px'
                             }}
@@ -618,39 +608,44 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
                         </div>
                       )}
                       
-                      <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal my-1">
-                        {getItemIcon(item.extension, item.type)}
-                        <span className="text-[14px] text-gray-900 ml-2.5">
+                      {/* Item badge */}
+                      <div className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
+                        {getFileIconHelper(item.extension, item.type)}
+                        <span className="text-[14px] text-gray-900 truncate max-w-[220px]">
                           {item.name}
                         </span>
-                      </Badge>
+                      </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                })
+              )}
 
-            {/* Show "to" folder for move operations */}
-            {isMove && destinationFolder && (
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-[13px] text-gray-600">to</span>
-                <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal">
-                  <FolderIcon className="w-[18px] h-[18px] text-gray-600 mr-2.5" />
-                  <span className="text-[14px] text-gray-900">{destinationFolder.name}</span>
-                </Badge>
-              </div>
-            )}
+              {/* Never show "in" context at bottom when parent folder is already shown at top */}
+              {showInContext && (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-[13px] text-gray-600">in</span>
+                  <div className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <FolderIcon className="w-5 h-5 text-gray-500" fill="currentColor" />
+                    </div>
+                    <span className="text-[14px] text-gray-900">{parentFolder.name}</span>
+                  </div>
+                </div>
+              )}
 
-            {/* Show "in" label for folder context in bulk uploads - appears after items */}
-            {isBulkOperation && (activity.action.includes('UPLOADED') || activity.action.includes('RESTORED')) && parentFolder && (
-              <div className="mt-3 flex items-start gap-2">
-                <span className="text-[13px] text-gray-600 pt-2">in</span>
-                <Badge variant="outline" className="h-9 px-4 rounded-full border-gray-300 bg-white hover:bg-gray-50 font-normal">
-                  <FolderIcon className="w-[18px] h-[18px] text-gray-600 mr-2.5" />
-                  <span className="text-[14px] text-gray-900">{parentFolder.name}</span>
-                </Badge>
-              </div>
-            )}
+              {/* Show "to" folder for move operations */}
+              {isMove && parentFolder && (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-[13px] text-gray-600">to</span>
+                  <div className="inline-flex items-center gap-2 h-9 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <FolderIcon className="w-5 h-5 text-gray-500" fill="currentColor" />
+                    </div>
+                    <span className="text-[14px] text-gray-900">{parentFolder.name}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -659,7 +654,8 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
 
   const renderActivityTab = () => {
     if (isLoadingActivity) {
-      return (<div className="flex items-center justify-center py-12">
+      return (
+        <div className="flex items-center justify-center py-12">
           <div className="text-gray-500">Loading activity...</div>
         </div>
       );
@@ -689,8 +685,10 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
           <div className="pt-6 pb-4">
             {groupedActivities.map(([period, periodActivities]) => (
               <div key={period} className="mb-8">
-                <h3 className="px-6 text-[17px] font-normal text-gray-900 mb-5">{period}</h3>
-                {periodActivities.map(renderActivityItem)}
+                <h3 className="px-6 text-[17px] font-medium text-gray-900 mb-4">{period}</h3>
+                <div className="space-y-0">
+                  {periodActivities.map(renderActivityItem)}
+                </div>
               </div>
             ))}
           </div>
@@ -701,7 +699,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
 
   return (
     <div className="w-[350px] pb-6 bg-white rounded-[16px] h-full flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {getFileIcon()}
@@ -715,7 +712,6 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
         </button>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-gray-200 bg-white">
         <button
           onClick={() => setActiveTab('details')}
@@ -745,8 +741,7 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto ">
+      <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center py-12 text-gray-500">
             Loading...
@@ -754,12 +749,10 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
         ) : (
           <>
             {activeTab === 'details' && renderDetailsTab()}
-            {/* {activeTab === 'activity' && renderActivityTab()} */}
+            {activeTab === 'activity' && renderActivityTab()}
           </>
         )}
       </div>
     </div>
   );
 }
-
-
