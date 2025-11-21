@@ -242,6 +242,12 @@ export interface ResetPasswordResponse {
   message: string;
   data: {
     userId: string;
+    email: string;
+    username: string;
+    role: string;
+    accessToken: string;
+    refreshToken: string;
+    redirectTo: string; // e.g., "/dashboard"
   };
 }
 

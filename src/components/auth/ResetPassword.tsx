@@ -120,7 +120,7 @@ export function ResetPassword({
             Reset Password
           </CardTitle>
           <p className="text-[#6B7280] text-[14px] mt-2 text-center lg:text-start">
-            Enter your new password below. After resetting, you'll need to verify with OTP.
+            Enter your new password below. You'll be automatically logged in after resetting.
           </p>
         </CardHeader>
         <CardContent className="lg:px-6 px-0">
@@ -222,10 +222,10 @@ export function ResetPassword({
                   {resetPasswordMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating Password...
+                      Resetting Password...
                     </>
                   ) : (
-                    "Update Password"
+                    "Reset Password & Login"
                   )}
                 </Button>
 

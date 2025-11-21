@@ -176,11 +176,12 @@ export const useForgotPassword = () => {
 };
 
 /**
- * Hook for resetting password
+ * Hook for resetting password with auto-login
+ * Updated to handle direct login after password reset
  */
 export const useResetPassword = () => {
   const navigate = useNavigate();
-  const setUnverifiedUser = useAuthStore((state) => state.setUnverifiedUser);
+  const setAuthenticatedUser = useAuthStore((state) => state.setAuthenticatedUser);
 
   return useMutation<
     ResetPasswordResponse,
@@ -189,12 +190,21 @@ export const useResetPassword = () => {
   >({
     mutationFn: resetPassword,
     onSuccess: (data) => {
-      // Set unverified user (needs OTP verification)
-      setUnverifiedUser(data.data.userId);
+      // Auto-login: Set authenticated user with tokens from response
+      setAuthenticatedUser({
+        userId: data.data.userId,
+        email: data.data.email,
+        username: data.data.username,
+        role: data.data.role,
+        accessToken: data.data.accessToken,
+        refreshToken: data.data.refreshToken,
+      });
       
       toast.success(data.message);
-      // Navigate to OTP verification
-      navigate(`/auth/verify-otp?userId=${data.data.userId}`);
+      
+      // Navigate to dashboard or use redirectTo from response
+      const redirectPath = data.data.redirectTo || '/dashboard';
+      navigate(redirectPath);
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Password reset failed';

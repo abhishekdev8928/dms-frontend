@@ -754,7 +754,7 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
         ) : (
           <>
             {activeTab === 'details' && renderDetailsTab()}
-            {/* {activeTab === 'activity' && renderActivityTab()} */}
+            {activeTab === 'activity' && renderActivityTab()}
           </>
         )}
       </div>
