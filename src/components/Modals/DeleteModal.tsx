@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { FileItem } from "@/types/fileSystem";
+import type { FileItem } from "@/types/documentTypes";
 
 interface DeleteModalProps {
   open: boolean;

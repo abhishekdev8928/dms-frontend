@@ -3,9 +3,6 @@ import { generatePresignedUrls } from "@/config/api/documentApi";
 import { createVersion } from "@/config/api/documentApi";
 import { useUploadStore } from "@/config/store/uploadStore";
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
 export interface FileReuploadOptions {
   documentId: string;
   changeDescription?: string;
@@ -18,16 +15,12 @@ export interface FileReuploadResult {
   versionId?: string;
 }
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
+
 const generateUniqueId = () => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
-// ============================================================================
-// MAIN REUPLOAD FUNCTION
-// ============================================================================
+
 export const reuploadFile = async (
   file: File,
   options: FileReuploadOptions

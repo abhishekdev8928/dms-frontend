@@ -32,7 +32,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import type { FileItem } from "@/types/fileSystem";
+import type { FileItem } from "@/types/documentTypes";
 
 interface ListViewProps {
   items: FileItem[];

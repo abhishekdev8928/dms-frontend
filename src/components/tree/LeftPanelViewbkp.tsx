@@ -52,7 +52,7 @@ import {
   createDepartmentSchema, 
   type CreateDepartmentInput 
 } from "@/utils/validations/departmentValidation";
-import CreateFolderModal from "@/components/RightPanelView/Modals/CreateFolderModal";
+import CreateFolderModal from "@/components/Modals/CreateFolderModal";
 
 // ============================================================================
 // TYPE DEFINITIONS

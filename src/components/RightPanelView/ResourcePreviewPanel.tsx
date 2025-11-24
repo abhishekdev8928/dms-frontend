@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getDocumentById } from '@/config/api/documentApi';
 import { getFolderById } from '@/config/api/folderApi';
 import { getFileActivity, getFolderActivity } from '@/config/api/activityApi';
-import type { FileItem } from '@/types/fileSystem';
+import type { FileItem } from '@/types/documentTypes';
 import type { Activity } from '@/config/api/activityApi';
 import { getFileIcon as getFileIconType } from '@/constants/getIcons';
 
@@ -19,7 +19,7 @@ interface FileInfoPanelProps {
 
 const CLOUDFRONT_BASE_URL = 'https://d1rf5tmmedb5ah.cloudfront.net';
 
-export default function FileInfoPanel({ item, selectionCount, onClose }: FileInfoPanelProps) {
+export default function ResourcePreviewPanel({ item, selectionCount, onClose }: FileInfoPanelProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details');
   const [previewError, setPreviewError] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(true);
@@ -316,7 +316,7 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     }
   };
 
-  // Render file preview like Google Drive
+  // Render file preview using iframe for ALL file types
   const renderPreview = () => {
     if (itemType === 'folder') {
       return (
@@ -329,111 +329,22 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
     const fullPreviewUrl = getFullPreviewUrl();
     const fileType = getFileTypeCategory();
 
-    // For images - show direct preview with skeleton
-    if (fileType === 'image' && fullPreviewUrl && !previewError) {
-      return (
-        <div className="bg-gray-50 border-b border-gray-200">
-          <div className="relative w-full h-48 flex items-center justify-center overflow-hidden">
-            {previewLoading && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Skeleton className="w-full h-full rounded-none" />
-              </div>
-            )}
-            <img 
-              src={fullPreviewUrl} 
-              alt={detailedItem?.name || 'Preview'}
-              className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
-              onLoad={() => setPreviewLoading(false)}
-              onError={() => {
-                setPreviewError(true);
-                setPreviewLoading(false);
-              }}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    // For PDFs - show embedded preview or thumbnail with skeleton
-    if (fileType === 'pdf' && fullPreviewUrl && !previewError) {
-      return (
-        <div className="bg-gray-50 border-b border-gray-200">
-          <div className="relative w-full h-56 overflow-hidden">
-            {previewLoading && (
-              <div className="absolute inset-0">
-                <Skeleton className="w-full h-full rounded-none" />
-              </div>
-            )}
-            <iframe
-              src={`${fullPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-              className={`w-full h-full border-0 transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
-              title={detailedItem?.name || 'PDF Preview'}
-              onLoad={() => setPreviewLoading(false)}
-              onError={() => {
-                setPreviewError(true);
-                setPreviewLoading(false);
-              }}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    // For videos - show video player with skeleton
-    if (fileType === 'video' && fullPreviewUrl && !previewError) {
-      return (
-        <div className="bg-black border-b border-gray-200">
-          <div className="relative w-full h-48 flex items-center justify-center">
-            {previewLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                <Skeleton className="w-full h-full rounded-none bg-gray-700" />
-              </div>
-            )}
-            <video 
-              src={fullPreviewUrl}
-              controls
-              className={`max-w-full max-h-full transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
-              onLoadedData={() => setPreviewLoading(false)}
-              onError={() => {
-                setPreviewError(true);
-                setPreviewLoading(false);
-              }}
-            >
-              Your browser does not support the video tag.
-            </video>
-          </div>
-        </div>
-      );
-    }
-
-    // For audio - show audio player with skeleton
-    if (fileType === 'audio' && fullPreviewUrl && !previewError) {
+    // If no URL, show fallback icon
+    if (!fullPreviewUrl) {
       return (
         <div className="bg-gray-50 border-b border-gray-200 px-4 py-8">
-          <div className="flex flex-col items-center justify-center gap-4">
-            <Music className="w-16 h-16 text-purple-500" />
-            {previewLoading && (
-              <Skeleton className="w-full max-w-[280px] h-12 rounded-full" />
-            )}
-            <audio 
-              src={fullPreviewUrl}
-              controls
-              className={`w-full max-w-[280px] transition-opacity duration-300 ${previewLoading ? 'opacity-0 absolute' : 'opacity-100'}`}
-              onLoadedData={() => setPreviewLoading(false)}
-              onError={() => {
-                setPreviewError(true);
-                setPreviewLoading(false);
-              }}
-            >
-              Your browser does not support the audio tag.
-            </audio>
+          <div className="flex flex-col items-center justify-center gap-3">
+            {getPreviewIcon(fileType)}
+            <span className="text-sm text-gray-500 uppercase font-medium">
+              {detailedItem?.extension || fileType}
+            </span>
           </div>
         </div>
       );
     }
 
-    // For documents (Word, Excel, PPT) - show Microsoft Office Online Viewer with skeleton
-    if (['document', 'spreadsheet', 'presentation'].includes(fileType) && fullPreviewUrl && !previewError) {
+    // Special handling for Office documents - use Microsoft Online Viewer
+    if (['document', 'spreadsheet', 'presentation'].includes(fileType)) {
       const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullPreviewUrl)}`;
       return (
         <div className="bg-gray-50 border-b border-gray-200">
@@ -458,53 +369,41 @@ export default function FileInfoPanel({ item, selectionCount, onClose }: FileInf
       );
     }
 
-    // For text files - try to show content with skeleton
-    if (fileType === 'text' && fullPreviewUrl && !previewError) {
-      return (
-        <div className="bg-gray-50 border-b border-gray-200">
-          <div className="relative w-full h-48 overflow-hidden">
-            {previewLoading && (
-              <div className="absolute inset-0 flex flex-col gap-2 p-4 bg-white">
-                <Skeleton className="w-full h-3" />
-                <Skeleton className="w-4/5 h-3" />
-                <Skeleton className="w-3/4 h-3" />
-                <Skeleton className="w-5/6 h-3" />
-                <Skeleton className="w-2/3 h-3" />
-                <Skeleton className="w-full h-3" />
-              </div>
-            )}
-            <iframe
-              src={fullPreviewUrl}
-              className={`w-full h-full border-0 bg-white transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
-              title={detailedItem?.name || 'Text Preview'}
-              onLoad={() => setPreviewLoading(false)}
-              onError={() => {
-                setPreviewError(true);
-                setPreviewLoading(false);
-              }}
-            />
-          </div>
-        </div>
-      );
-    }
-
-    // Default fallback - show file type icon
+    // For all other file types, use iframe
     return (
-      <div className="bg-gray-50 border-b border-gray-200 px-4 py-8">
-        <div className="flex flex-col items-center justify-center gap-3">
-          {getPreviewIcon(fileType)}
-          <span className="text-sm text-gray-500 uppercase font-medium">
-            {detailedItem?.extension || fileType}
-          </span>
-          {fullPreviewUrl && (
-            <a 
-              href={fullPreviewUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Open in new tab
-            </a>
+      <div className="bg-gray-50 border-b border-gray-200">
+        <div className="relative w-full h-56 overflow-hidden">
+          {previewLoading && (
+            <div className="absolute inset-0">
+              <Skeleton className="w-full h-full rounded-none" />
+            </div>
+          )}
+          <iframe
+            src={fullPreviewUrl}
+            className={`w-full h-full border-0 transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
+            title={detailedItem?.name || 'File Preview'}
+            onLoad={() => setPreviewLoading(false)}
+            onError={() => {
+              setPreviewError(true);
+              setPreviewLoading(false);
+            }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          />
+          {previewError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-50">
+              {getPreviewIcon(fileType)}
+              <span className="text-sm text-gray-500 uppercase font-medium">
+                {detailedItem?.extension || fileType}
+              </span>
+              <a 
+                href={fullPreviewUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Open in new tab
+              </a>
+            </div>
           )}
         </div>
       </div>

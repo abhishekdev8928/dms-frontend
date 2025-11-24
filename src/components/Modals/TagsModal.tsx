@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { useState, useEffect } from "react";
-import type { FileItem } from "@/types/fileSystem";
+import type { FileItem } from "@/types/documentTypes";
 
 interface TagsModalProps {
   open: boolean;

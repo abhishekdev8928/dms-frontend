@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   MoreVertical,
   X,
-  FileText,
 } from "lucide-react";
 import { getFileIcon } from "@/constants/getIcons";
 

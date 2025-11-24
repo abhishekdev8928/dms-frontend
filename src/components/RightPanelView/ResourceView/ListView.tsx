@@ -32,7 +32,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import type { FileItem } from "@/types/fileSystem";
+import type { FileItem } from "@/types/documentTypes";
 
 interface ListViewProps {
   items: FileItem[];
@@ -142,7 +142,7 @@ export default function ListView({
   return (
     <div className="w-full">
       <TooltipProvider>
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-scroll">
+        <div className="bg-white rounded-lg border border-[#919191] overflow-x-scroll">
           <div className="overflow-x-scroll ">
             <table className="w-full min-w-[900px]  ">
               <thead className="bg-gray-50 sticky top-0 z-10">

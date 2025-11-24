@@ -1,7 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import DepartmentPage from "../pages/Dashboard/DepartmentPage";
-import FileVersionHistory from "@/components/custom/FileVersionHistroy";
+import FileVersionHistory from "@/pages/Dashboard/FileVersionHistroy";
 import LoginPage from "@/pages/Auth/LoginPage";
 import OTPPage from "@/pages/Auth/VerifyOtpPage";
 import Resetpassword from "@/pages/Auth/ResetPasswordPage";

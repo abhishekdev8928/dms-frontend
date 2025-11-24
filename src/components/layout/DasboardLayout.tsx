@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
-import TopHeader from "../custom/TopHeader";
+import TopHeader from "@/components/common/TopHeader";
 import { LeftPanelView } from "../tree/LeftPanelView";
 import { useIsAuthenticated } from "@/config/store/authStore";
 import { useUploadWarning } from '@/config/store/uploadStore';
@@ -17,7 +17,7 @@ const DashboardLayout = () => {
       <LeftPanelView />
       <div className="flex flex-col h-screen overflow-hidden">
         <TopHeader />
-        <main className="flex-1 overflow-hidden px-6">
+        <main className="flex-1 overflow-hidden px-2">
           <Outlet />
         </main>
       </div>

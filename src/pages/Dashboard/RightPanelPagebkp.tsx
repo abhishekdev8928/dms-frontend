@@ -45,19 +45,19 @@ import {
 import { validateFile } from "@/utils/helper/fileReuploadHelper";
 import { uploadFolder } from "@/utils/helper/folderUploadHelper";
 
-import { useFolderMutations } from "@/hooks/useFolderMutations";
-import { useDocumentMutations } from "@/hooks/useDocumentMutations";
-import FileInfoPanel from "@/components/custom/FileInfoPanel";
-import GridView from "@/components/RightPanelView/Views/GridView";
-import ListView from "@/components/RightPanelView/Views/ListView";
-import RenameFolderModal from "@/components/RightPanelView/Modals/RenameFolderModal";
-import TagsModal from "@/components/RightPanelView/Modals/TagsModal";
-import DeleteModal from "@/components/RightPanelView/Modals/DeleteModal";
+import { useFolderMutations } from "@/hooks/mutations/useFolderMutations";
+import { useDocumentMutations } from "@/hooks/mutations/useDocumentMutations";
+import FileInfoPanel from "@/components/RightPanelView/ResourcePreviewPanel";
+import GridView from "@/components/RightPanelView/ResourceView/GridView";
+import ListView from "@/components/RightPanelView/ResourceView/ListView";
+import RenameFolderModal from "@/components/Modals/RenameFolderModal";
+import TagsModal from "@/components/Modals/TagsModal";
+import DeleteModal from "@/components/Modals/DeleteModal";
 import FilterButtons from "./FilterBox";
-import CreateFolderModal from "@/components/RightPanelView/Modals/CreateFolderModal";
-import RenameDocumentModal from "@/components/RightPanelView/Modals/RenameDocumentModal";
+import CreateFolderModal from "@/components/Modals/CreateFolderModal";
+import RenameDocumentModal from "@/components/Modals/RenameDocumentModal";
 
-import type { FileItem, Breadcrumb } from "@/types/fileSystem";
+import type { FileItem, Breadcrumb } from "@/types/documentTypes";
 
 const getFormattedDateTime = () => {
   const now = new Date();

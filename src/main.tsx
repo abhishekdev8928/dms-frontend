@@ -8,7 +8,7 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
-import { GlobalUploadProgress } from "@/components/custom/GlobalUploadProgress";
+import { GlobalUploadProgress } from "@/components/common/GlobalUploadProgress.tsx";
 
 export const queryClient = new QueryClient();
 

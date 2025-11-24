@@ -25,8 +25,7 @@ export interface FileItem {
 }
 
 export interface Breadcrumb {
-  _id: string;
+  id: string; // Changed from _id to id to match API response
   name: string;
-  type: string;
-  path: string;
+  type: "department" | "folder";
 }

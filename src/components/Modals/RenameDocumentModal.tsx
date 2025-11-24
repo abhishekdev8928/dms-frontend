@@ -1,4 +1,4 @@
-import type { FileItem } from "@/types/fileSystem";
+import type { FileItem } from "@/types/documentTypes";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
