@@ -54,6 +54,8 @@ const TrashScreen = () => {
     mutationFn: restoreTrashItem,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["trashItem"] });
+      queryClient.invalidateQueries({ queryKey: ["children"] });
+      queryClient.invalidateQueries({ queryKey: ["tree"] });
       toast.success("Item restored successfully");
     },
     onError: (error: any) => {
@@ -65,6 +67,8 @@ const TrashScreen = () => {
     mutationFn: permanentDeleteTrashItem,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["trashItem"] });
+      queryClient.invalidateQueries({ queryKey: ["children"] });
+      queryClient.invalidateQueries({ queryKey: ["tree"] });
       toast.success("Item permanently deleted");
     },
     onError: (error: any) => {
@@ -76,9 +80,9 @@ const TrashScreen = () => {
     mutationFn: bulkRestoreTrashItems,
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["trashItem"] });
-       queryClient.invalidateQueries({ queryKey: ["children"] });
+      queryClient.invalidateQueries({ queryKey: ["children"] });
       queryClient.invalidateQueries({ queryKey: ["tree"] });
-      queryClient.invalidateQueries({queryKey:["breadcrumbs"]})
+      
       setSelectedItems([]);
       
       const { restoredCount, failedCount } = response.data;
@@ -100,7 +104,7 @@ const TrashScreen = () => {
       queryClient.invalidateQueries({ queryKey: ["trashItem"] });
        queryClient.invalidateQueries({ queryKey: ["children" ]});
       queryClient.invalidateQueries({ queryKey: ["tree"] });
-      queryClient.invalidateQueries({queryKey:["breadcrumbs"]})
+      
       setSelectedItems([]);
       
       const { deletedCount, failedCount } = response.data;

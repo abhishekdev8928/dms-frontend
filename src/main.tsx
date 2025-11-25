@@ -7,6 +7,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'sonner';
 import { GlobalUploadProgress } from "@/components/common/GlobalUploadProgress.tsx";
 
@@ -29,6 +30,9 @@ createRoot(document.getElementById('root')!).render(
         }}
       />
       <RouterProvider router={router} />
+      
+      {/* React Query DevTools */}
+      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   </StrictMode>
 )

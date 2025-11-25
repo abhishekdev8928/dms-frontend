@@ -53,6 +53,7 @@ import {
   type CreateDepartmentInput 
 } from "@/utils/validations/departmentValidation";
 import CreateFolderModal from "@/components/Modals/CreateFolderModal";
+import { DropdownMenuSeparator } from "@radix-ui/react-dropdown-menu";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -471,36 +472,6 @@ export const LeftPanelView = () => {
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="start" className="w-[240px] p-[10px]">
-                <DropdownMenuItem
-                  className="py-2 cursor-pointer hover:bg-[#F6FFFD] mb-1"
-                  onClick={() => setIsDeptModalOpen(true)}
-                >
-                    <svg width="15" height="19" viewBox="0 0 15 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M0.800781 15.3834V2.88338C0.800781 2.33085 1.02027 1.80094 1.41098 1.41024C1.80168 1.01954 2.33158 0.800049 2.88411 0.800049H13.3008C13.5218 0.800049 13.7338 0.887846 13.89 1.04413C14.0463 1.20041 14.1341 1.41237 14.1341 1.63338V16.6334C14.1341 16.8544 14.0463 17.0664 13.89 17.2226C13.7338 17.3789 13.5218 17.4667 13.3008 17.4667H2.88411C2.33158 17.4667 1.80168 17.2472 1.41098 16.8565C1.02027 16.4658 0.800781 15.9359 0.800781 15.3834ZM0.800781 15.3834C0.800781 14.8308 1.02027 14.3009 1.41098 13.9102C1.80168 13.5195 2.33158 13.3 2.88411 13.3H14.1341" stroke="#434343" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  {/* <LucideBuilding2 className="w-4 h-4 mr-2 text-gray-600" /> */}
-                  <div className="flex-1">
-                    <div className="text-[16px] roboto">Create Department</div>
-                  </div>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""} hover:bg-[#F6FFFD] mb-1`}
-                  onClick={handleOpenFolderModal}
-                  disabled={!parentId}
-                >
-                
-                  <svg width="19" height="16" viewBox="0 0 19 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9.13411 6.63338V11.6334M6.63411 9.13338H11.6341M15.8008 14.9667C16.2428 14.9667 16.6667 14.7911 16.9793 14.4786C17.2919 14.166 17.4674 13.7421 17.4674 13.3V4.96672C17.4674 4.52469 17.2919 4.10076 16.9793 3.7882C16.6667 3.47564 16.2428 3.30005 15.8008 3.30005H9.21745C8.93871 3.30278 8.66374 3.23556 8.4177 3.10453C8.17166 2.97351 7.96241 2.78286 7.80911 2.55005L7.13411 1.55005C6.98236 1.31961 6.77576 1.13045 6.53286 0.999546C6.28997 0.868644 6.01837 0.800094 5.74245 0.800049H2.46745C2.02542 0.800049 1.6015 0.975643 1.28894 1.2882C0.976376 1.60076 0.800781 2.02469 0.800781 2.46672V13.3C0.800781 13.7421 0.976376 14.166 1.28894 14.4786C1.6015 14.7911 2.02542 14.9667 2.46745 14.9667H15.8008Z" stroke="#434343" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-
-                  {/* <Folder className="w-4 h-4 mr-2 text-gray-600" /> */}
-                  <div className="flex-1">
-                    <div className="text-[16px] roboto">Create Folder</div>
-                  </div>
-                </DropdownMenuItem>
-
-                <div className="h-px bg-gray-200 my-1" />
 
                 <DropdownMenuItem
                   className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""} hover:bg-[#F6FFFD] mb-1`}
@@ -531,6 +502,42 @@ export const LeftPanelView = () => {
                     <div className="text-[16px] roboto">Folder Upload</div>
                   </div>
                 </DropdownMenuItem>
+
+                <DropdownMenuSeparator/>
+                <DropdownMenuItem
+                  className={`py-2 cursor-pointer ${!parentId ? "opacity-50 cursor-not-allowed" : ""} hover:bg-[#F6FFFD] mb-1`}
+                  onClick={handleOpenFolderModal}
+                  disabled={!parentId}
+                >
+                
+                  <svg width="19" height="16" viewBox="0 0 19 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9.13411 6.63338V11.6334M6.63411 9.13338H11.6341M15.8008 14.9667C16.2428 14.9667 16.6667 14.7911 16.9793 14.4786C17.2919 14.166 17.4674 13.7421 17.4674 13.3V4.96672C17.4674 4.52469 17.2919 4.10076 16.9793 3.7882C16.6667 3.47564 16.2428 3.30005 15.8008 3.30005H9.21745C8.93871 3.30278 8.66374 3.23556 8.4177 3.10453C8.17166 2.97351 7.96241 2.78286 7.80911 2.55005L7.13411 1.55005C6.98236 1.31961 6.77576 1.13045 6.53286 0.999546C6.28997 0.868644 6.01837 0.800094 5.74245 0.800049H2.46745C2.02542 0.800049 1.6015 0.975643 1.28894 1.2882C0.976376 1.60076 0.800781 2.02469 0.800781 2.46672V13.3C0.800781 13.7421 0.976376 14.166 1.28894 14.4786C1.6015 14.7911 2.02542 14.9667 2.46745 14.9667H15.8008Z" stroke="#434343" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+
+                  {/* <Folder className="w-4 h-4 mr-2 text-gray-600" /> */}
+                  <div className="flex-1">
+                    <div className="text-[16px] roboto">Create Folder</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="py-2 cursor-pointer hover:bg-[#F6FFFD] mb-1"
+                  onClick={() => setIsDeptModalOpen(true)}
+                >
+                    <svg width="15" height="19" viewBox="0 0 15 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0.800781 15.3834V2.88338C0.800781 2.33085 1.02027 1.80094 1.41098 1.41024C1.80168 1.01954 2.33158 0.800049 2.88411 0.800049H13.3008C13.5218 0.800049 13.7338 0.887846 13.89 1.04413C14.0463 1.20041 14.1341 1.41237 14.1341 1.63338V16.6334C14.1341 16.8544 14.0463 17.0664 13.89 17.2226C13.7338 17.3789 13.5218 17.4667 13.3008 17.4667H2.88411C2.33158 17.4667 1.80168 17.2472 1.41098 16.8565C1.02027 16.4658 0.800781 15.9359 0.800781 15.3834ZM0.800781 15.3834C0.800781 14.8308 1.02027 14.3009 1.41098 13.9102C1.80168 13.5195 2.33158 13.3 2.88411 13.3H14.1341" stroke="#434343" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  {/* <LucideBuilding2 className="w-4 h-4 mr-2 text-gray-600" /> */}
+                  <div className="flex-1">
+                    <div className="text-[16px] roboto">Create Department</div>
+                  </div>
+                </DropdownMenuItem>
+
+
+                
+
+                {/* <div className="h-px bg-gray-200 my-1" /> */}
+
+                
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

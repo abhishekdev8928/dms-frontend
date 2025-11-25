@@ -49,7 +49,6 @@ export const useFolderMutations = (parentId?: string, breadcrumbs?: any[]) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["children", parentId] });
       queryClient.invalidateQueries({ queryKey: ["tree"] });
-      queryClient.invalidateQueries({ queryKey: ["breadcrumbs", parentId] });
       toast.success("Folder updated successfully", {
         description: getFormattedDateTime(),
       });
@@ -74,19 +73,17 @@ export const useFolderMutations = (parentId?: string, breadcrumbs?: any[]) => {
 
         // Invalidate queries for the parent folder
         queryClient.invalidateQueries({ queryKey: ["children", parentFolderId] });
-        queryClient.invalidateQueries({ queryKey: ["breadcrumbs", parentFolderId] });
+        
       } else {
         // Normal deletion of a child folder - just invalidate current folder
         queryClient.invalidateQueries({ queryKey: ["children", parentId] });
-        queryClient.invalidateQueries({ queryKey: ["breadcrumbs", parentId] });
+        
       }
 
       // Always invalidate tree
       queryClient.invalidateQueries({ queryKey: ["tree"] });
 
-      toast.success("Folder moved to trash", {
-        description: "You can restore it from trash",
-      });
+     
     },
     onError: (error: any) => {
       toast.error("Failed to move folder to trash", {

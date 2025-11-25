@@ -40,6 +40,7 @@ export const useDepartmentMutation = () => {
       });
       queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["tree"] });
+      queryClient.invalidateQueries({queryKey:["children"]});
     },
     onError: (error: any) => {
       toast.error("Update Failed", {
