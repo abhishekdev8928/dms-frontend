@@ -19,7 +19,7 @@ interface FileInfoPanelProps {
 
 const CLOUDFRONT_BASE_URL = 'https://d1rf5tmmedb5ah.cloudfront.net';
 
-export default function ResourcePreviewPanel({ item, selectionCount, onClose }: FileInfoPanelProps) {
+export default function   ResourcePreviewPanel({ item, selectionCount, onClose }: FileInfoPanelProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details');
   const [previewError, setPreviewError] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(true);

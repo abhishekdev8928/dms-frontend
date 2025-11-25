@@ -221,7 +221,7 @@ export default function GridView({
             <div className="aspect-square flex items-center rounded-lg justify-center p-4  p-1 bg-[#F5F5F5]">
               {isFolder(item) ? (
                 <div 
-                  className="w-20 h-20 rounded-xl flex items-center justify-center shadow-sm" 
+                  className="w-20 h-20 rounded-xl flex items-center justify-center " 
                 >
                   <svg width="87" height="75" viewBox="0 0 87 75" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M76.8008 72.6334C79.0109 72.6334 81.1305 71.7554 82.6933 70.1926C84.2561 68.6298 85.1341 66.5102 85.1341 64.3001V22.6334C85.1341 20.4232 84.2561 18.3036 82.6933 16.7408C81.1305 15.178 79.0109 14.3 76.8008 14.3H43.8841C42.4904 14.3137 41.1156 13.9776 39.8854 13.3225C38.6552 12.6673 37.609 11.7141 36.8424 10.55L33.4675 5.55005C32.7087 4.39784 31.6757 3.45204 30.4612 2.79753C29.2467 2.14302 27.8887 1.80028 26.5091 1.80005H10.1341C7.92398 1.80005 5.80436 2.67802 4.24156 4.24083C2.67875 5.80363 1.80078 7.92325 1.80078 10.1334V64.3001C1.80078 66.5102 2.67875 68.6298 4.24156 70.1926C5.80436 71.7554 7.92398 72.6334 10.1341 72.6334H76.8008Z" stroke="#1E1E1E" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>

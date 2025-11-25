@@ -1,42 +1,14 @@
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { List, Grid3x3, Info } from "lucide-react";
 
-import {
-  List,
-  Grid3x3,
-  Info,
-  Upload,
-  ChevronRight,
-  FolderPlus,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  FolderUp,
-} from "lucide-react";
+import EmptyState from "@/components/RightPanelView/EmptyState";
 import { Button } from "@/components/ui/button";
-import {
-  Breadcrumb as BreadcrumbComponent,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-import { getChildFolders } from "@/config/api/folderApi";
-import { getBreadcrumbs } from "@/config/api/treeApi";
 import { generateDownloadUrl } from "@/config/api/documentApi";
-import { getAllUsers } from "@/config/api/searchApi";
 import {
   uploadFiles,
   validateFiles,
@@ -47,6 +19,10 @@ import { uploadFolder } from "@/utils/helper/folderUploadHelper";
 
 import { useFolderMutations } from "@/hooks/mutations/useFolderMutations";
 import { useDocumentMutations } from "@/hooks/mutations/useDocumentMutations";
+import { useFolderQueries } from "@/hooks/queries/useFolderQueries";
+import { useUserQueries } from "@/hooks/queries/useUserQueries";
+import { useDepartmentMutation } from "@/hooks/mutations/useDepartmentMutation";
+
 import FileInfoPanel from "@/components/RightPanelView/ResourcePreviewPanel";
 import GridView from "@/components/RightPanelView/ResourceView/GridView";
 import ListView from "@/components/RightPanelView/ResourceView/ListView";
@@ -56,8 +32,12 @@ import DeleteModal from "@/components/Modals/DeleteModal";
 import FilterButtons from "./FilterBox";
 import CreateFolderModal from "@/components/Modals/CreateFolderModal";
 import RenameDocumentModal from "@/components/Modals/RenameDocumentModal";
+import { BreadcrumbNavigation } from "@/components/RightPanelView/BreadcrumbNavigation";
 
-import type { FileItem, Breadcrumb } from "@/types/documentTypes";
+import type { FileItem } from "@/types/documentTypes";
+import { BulkActionToolbar } from "@/components/RightPanelView/Actions/BulkActionToolbar";
+import { DepartmentModal } from "@/components/Modals/DepartmentModal";
+import type { Department } from "@/config/api/departmentApi";
 
 const getFormattedDateTime = () => {
   const now = new Date();
@@ -88,54 +68,58 @@ export default function RightPanelView() {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [reuploadDocumentId, setReuploadDocumentId] = useState<string | null>(null);
-  const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<FileItem | null>(null);
-
 
   // Modal states
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
+  const [departmentModalOpen, setDepartmentModalOpen] = useState(false);
+  const [departmentModalMode, setDepartmentModalMode] = useState<"add" | "edit">("add");
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reuploadInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  // Queries
-  const { data: childrenData, isLoading, error } = useQuery({
-    queryKey: ["children", parentId, selectedTypeFilter, selectedUser],
-    queryFn: async () => {
-      const res = await getChildFolders(parentId || "", {
-        type: selectedTypeFilter || undefined,
-        userEmail: selectedUser || undefined,
-      });
-      return structuredClone(res);
-    },
-    enabled: !!parentId,
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<{
+    fileIds: string[];
+    folderIds: string[];
+  }>({
+    fileIds: [],
+    folderIds: [],
   });
 
-  const { data: breadcrumbsData } = useQuery({
-    queryKey: ["breadcrumbs", parentId],
-    queryFn: () => getBreadcrumbs(parentId || ""),
-    enabled: !!parentId,
+  // Custom hooks
+  const { updateMutation: updateDepartmentMutation } = useDepartmentMutation();
+
+  // Fetch folder children and breadcrumbs
+  const {
+    items,
+    breadcrumbs,
+    isChildrenLoading: isLoading,
+    childrenError: error,
+  } = useFolderQueries({
+    parentId,
+    selectedTypeFilter,
+    selectedUser,
   });
 
-  const { data: usersData } = useQuery({
-    queryKey: ["userList"],
-    queryFn: getAllUsers,
-  });
+  // Fetch users for filter dropdown
+  const { usersData } = useUserQueries();
 
-  // Mutations
   const { createFolderMutation, updateFolderMutation, deleteFolderMutation } =
-    useFolderMutations(parentId);
+    useFolderMutations(parentId, breadcrumbs);
 
   const {
     reuploadMutation,
     updateDocumentMutation,
     deleteDocumentMutation,
     addTagsMutation,
+    bulkDeletionMutation,
   } = useDocumentMutations(
     parentId,
     selectedFileId,
@@ -143,14 +127,60 @@ export default function RightPanelView() {
     setReuploadDocumentId
   );
 
-  // Data
-  const items: FileItem[] = childrenData?.children || [];
-  const breadcrumbs: Breadcrumb[] = Array.isArray(breadcrumbsData)
-    ? breadcrumbsData
-    : breadcrumbsData?.data || [];
+  // Computed values
   const isEmpty = items.length === 0;
 
-  // Event Handlers
+  // Department handlers
+  const handleDepartmentSubmit = (data: any) => {
+    if (selectedDepartment?._id) {
+      updateDepartmentMutation.mutate(
+        {
+          id: selectedDepartment._id,
+          data: { name: data.name },
+        },
+        {
+          onSuccess: () => {
+            setDepartmentModalOpen(false);
+            setSelectedDepartment(null);
+          },
+        }
+      );
+    }
+  };
+
+  const handleEditDepartment = (department: Department) => {
+    setDepartmentModalMode("edit");
+    setSelectedDepartment(department);
+    setDepartmentModalOpen(true);
+  };
+
+  // Selection handlers
+  const handleItemSelection = (
+    e: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    item: { id: string; type: string }
+  ): void => {
+    const key = item.type === "folder" ? "folderIds" : "fileIds";
+
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedIds((prev) => {
+        const exists = prev[key].includes(item.id);
+        return {
+          ...prev,
+          [key]: exists
+            ? prev[key].filter((id) => id !== item.id)
+            : [...prev[key], item.id],
+        };
+      });
+    } else {
+      const newSelectedIds = {
+        fileIds: item.type !== "folder" ? [item.id] : [],
+        folderIds: item.type === "folder" ? [item.id] : [],
+      };
+      setSelectedIds(newSelectedIds);
+    }
+  };
+
+  // File upload handlers
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0 || !parentId) return;
 
@@ -170,25 +200,18 @@ export default function RightPanelView() {
       return;
     }
 
-    const loadingToast = toast.loading(
-      `Uploading ${validFiles.length} file(s)...`,
-      { description: getFormattedDateTime() }
-    );
-
     try {
       await uploadFiles(validFiles, {
         parentId,
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["children", parentId] });
           queryClient.invalidateQueries({ queryKey: ["tree"] });
-          toast.dismiss(loadingToast);
           toast.success(`${validFiles.length} file(s) uploaded successfully`, {
             description: getFormattedDateTime(),
           });
         },
         onError: (error) => {
           console.error("Upload error:", error);
-          toast.dismiss(loadingToast);
           toast.error("Upload failed", {
             description: error?.message || getFormattedDateTime(),
           });
@@ -196,7 +219,6 @@ export default function RightPanelView() {
       });
     } catch (error: any) {
       console.error("Upload failed:", error);
-      toast.dismiss(loadingToast);
       toast.error("Upload failed", {
         description: error?.message || getFormattedDateTime(),
       });
@@ -222,10 +244,6 @@ export default function RightPanelView() {
       return;
     }
 
-    const loadingToast = toast.loading("Uploading folder...", {
-      description: getFormattedDateTime(),
-    });
-
     try {
       await uploadFolder(validFiles, {
         parentId,
@@ -235,7 +253,6 @@ export default function RightPanelView() {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["children", parentId] });
           queryClient.invalidateQueries({ queryKey: ["tree"] });
-          toast.dismiss(loadingToast);
           toast.success("Folder uploaded successfully", {
             description: getFormattedDateTime(),
           });
@@ -243,7 +260,6 @@ export default function RightPanelView() {
       });
     } catch (error: any) {
       console.error("Folder upload failed:", error);
-      toast.dismiss(loadingToast);
       toast.error("Folder upload failed", {
         description: error?.message || getFormattedDateTime(),
       });
@@ -288,6 +304,7 @@ export default function RightPanelView() {
     }
   };
 
+  // Item action handlers
   const handleDownload = async (item: FileItem) => {
     try {
       const response = await generateDownloadUrl(item._id);
@@ -303,14 +320,19 @@ export default function RightPanelView() {
     }
   };
 
-  const handleShowInfo = (fileId: string) => {
-    setSelectedFileId(fileId);
+  const handleShowInfo = (item: FileItem) => {
+    setSelectedFileId(item._id);
+    setSelectedItem(item);
     setShowInfoPanel(true);
   };
 
   const handleItemClick = (item: FileItem) => {
     if (item.type === "folder") {
       navigate(`/dashboard/folder/${item._id}`);
+      setSelectedIds({
+        fileIds: [],
+        folderIds: [],
+      });
     }
   };
 
@@ -329,6 +351,7 @@ export default function RightPanelView() {
     setTagsModalOpen(true);
   };
 
+  // Drag and drop handlers
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -355,310 +378,296 @@ export default function RightPanelView() {
   const isFolder = (item: FileItem | null): boolean =>
     item !== null && item.type === "folder";
 
-  // Action handlers
-  const handleCreateFolderClick = () => {
-    setActionsDropdownOpen(false);
-    setCreateFolderModalOpen(true);
+  // Bulk action props
+  const bulkActionToolBarProps = {
+    onClearSelection: () =>
+      setSelectedIds({
+        fileIds: [],
+        folderIds: [],
+      }),
+    selectionCount: selectedIds.fileIds.length + selectedIds.folderIds.length,
+    onDeleteSelected: () => {
+      bulkDeletionMutation.mutate(selectedIds);
+      setSelectedIds({
+        fileIds: [],
+        folderIds: [],
+      });
+    },
   };
 
-  const handleFileUploadClick = () => {
-    setActionsDropdownOpen(false);
-    fileInputRef.current?.click();
-  };
+  // Effect to update selected item
+  React.useEffect(() => {
+    const totalSelected = selectedIds.fileIds.length + selectedIds.folderIds.length;
 
-  const handleFolderUploadClick = () => {
-    setActionsDropdownOpen(false);
-    folderInputRef.current?.click();
-  };
+    if (totalSelected === 1) {
+      const selectedId = selectedIds.fileIds[0] || selectedIds.folderIds[0];
+      const selectedItem = items.find((item) => item._id === selectedId);
+
+      if (selectedItem) {
+        setSelectedItem(selectedItem);
+        setSelectedFileId(selectedId);
+      }
+    } else {
+      setSelectedItem(null);
+      setSelectedFileId(null);
+    }
+  }, [selectedIds, items]);
 
   return (
-    <div className="h-full flex">
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <BreadcrumbComponent>
-            <BreadcrumbList>
-              {breadcrumbs.map((crumb, index) => (
-                <React.Fragment key={crumb._id}>
-                  {index > 0 && (
-                    <BreadcrumbSeparator>
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
-                    </BreadcrumbSeparator>
-                  )}
-                  <BreadcrumbItem>
-                    {index === breadcrumbs.length - 1 ? (
-                      <div className="flex items-center gap-2">
-                        <BreadcrumbPage className="text-gray-900 text-[24px] font-normal">
-                          {crumb.name}
-                        </BreadcrumbPage>
-                        <DropdownMenu
-                          open={actionsDropdownOpen}
-                          onOpenChange={setActionsDropdownOpen}
-                        >
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 hover:bg-gray-100 rounded"
-                            >
-                              {actionsDropdownOpen ? (
-                                <ChevronUp className="w-4 h-4 text-gray-600" />
-                              ) : (
-                                <ChevronDown className="w-4 h-4 text-gray-600" />
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-[220px]">
-                            <DropdownMenuItem
-                              className="py-2 cursor-pointer"
-                              onClick={handleCreateFolderClick}
-                            >
-                              <FolderPlus className="w-4 h-4 mr-2 text-gray-600" />
-                              <span className="text-sm">Create Folder</span>
-                            </DropdownMenuItem>
+    <div className="h-full flex flex-col py-4">
+      <div className="flex-1 flex gap-4 overflow-hidden">
+        {/* Main Content Area */}
+        <div className="flex-1 bg-white rounded-2xl shadow-sm flex flex-col overflow-hidden">
+          {/* Header - Fixed */}
+          <div className="flex-shrink-0 p-6 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <BreadcrumbNavigation
+                breadcrumbs={breadcrumbs}
+                onBreadcrumbClick={handleBreadcrumbClick}
+                onCreateFolder={() => setCreateFolderModalOpen(true)}
+                onRename={handleRename}
+                onDelete={handleDelete}
+                onEditDepartment={handleEditDepartment}
+              />
 
-                            <DropdownMenuSeparator />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="icon"
+                  onClick={() => setViewMode("list")}
+                  className={
+                    viewMode === "list" ? "bg-teal-500 hover:bg-teal-600" : ""
+                  }
+                >
+                  <List className="w-5 h-5" />
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="icon"
+                  onClick={() => setViewMode("grid")}
+                  className={
+                    viewMode === "grid" ? "bg-teal-500 hover:bg-teal-600" : ""
+                  }
+                >
+                  <Grid3x3 className="w-5 h-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowInfoPanel(!showInfoPanel)}
+                  className={showInfoPanel ? "bg-gray-100" : ""}
+                >
+                  <Info className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
 
-                            <DropdownMenuItem
-                              className="py-2 cursor-pointer"
-                              onClick={handleFileUploadClick}
-                            >
-                              <FileText className="w-4 h-4 mr-2 text-gray-600" />
-                              <span className="text-sm">Upload Files</span>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              className="py-2 cursor-pointer"
-                              onClick={handleFolderUploadClick}
-                            >
-                              <FolderUp className="w-4 h-4 mr-2 text-gray-600" />
-                              <span className="text-sm">Upload Folder</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    ) : (
-                      <BreadcrumbLink
-                        asChild
-                        className="text-gray-700 text-[24px] hover:text-teal-600 transition-colors font-normal cursor-pointer"
-                        onClick={() => handleBreadcrumbClick(crumb._id)}
-                      >
-                        <span>{crumb.name}</span>
-                      </BreadcrumbLink>
-                    )}
-                  </BreadcrumbItem>
-                </React.Fragment>
-              ))}
-            </BreadcrumbList>
-          </BreadcrumbComponent>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("list")}
-              className={
-                viewMode === "list" ? "bg-teal-500 hover:bg-teal-600" : ""
-              }
-            >
-              <List className="w-5 h-5" />
-            </Button>
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("grid")}
-              className={
-                viewMode === "grid" ? "bg-teal-500 hover:bg-teal-600" : ""
-              }
-            >
-              <Grid3x3 className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowInfoPanel(!showInfoPanel)}
-              className={showInfoPanel ? "bg-gray-100" : ""}
-            >
-              <Info className="w-5 h-5" />
-            </Button>
+            {/* Filter Buttons */}
+            <div className="right-panel-filter">
+              {selectedIds.fileIds.length > 0 || selectedIds.folderIds.length > 0 ? (
+                <BulkActionToolbar {...bulkActionToolBarProps} />
+              ) : (
+                <FilterButtons
+                  selectedTypeFilter={selectedTypeFilter}
+                  setSelectedTypeFilter={setSelectedTypeFilter}
+                  selectedUser={selectedUser}
+                  setSelectedUser={setSelectedUser}
+                  userData={usersData}
+                />
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Filters */}
-        <div className="right-panel-filter">
-          <FilterButtons
-            selectedTypeFilter={selectedTypeFilter}
-            setSelectedTypeFilter={setSelectedTypeFilter}
-            selectedUser={selectedUser}
-            setSelectedUser={setSelectedUser}
-            userData={usersData}
-          />
-        </div>
-
-        {/* Content */}
-        <div
-          className="flex-1 relative"
+          {/* Scrollable Content Area */}
+          <div
+          className="flex-1 overflow-hidden"
           onDragEnter={isEmpty ? handleDrag : undefined}
           onDragLeave={isEmpty ? handleDrag : undefined}
           onDragOver={isEmpty ? handleDrag : undefined}
           onDrop={isEmpty ? handleDrop : undefined}
         >
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20 text-gray-500">
-              Loading...
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <p className="text-red-600 mb-4">Failed to load folder</p>
-              <Button
-                onClick={() =>
-                  queryClient.invalidateQueries({
-                    queryKey: ["children", parentId],
-                  })
-                }
-              >
-                Retry
-              </Button>
-            </div>
-          ) : isEmpty ? (
-            selectedTypeFilter && selectedTypeFilter.trim() !== "" ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center text-gray-600">
-                <img
-                  src="/no-results.svg"
-                  alt="No matching results"
-                  className="w-64 mb-6 opacity-80"
-                />
-                <h2 className="text-xl font-semibold">No matching results</h2>
-                <p className="text-gray-500 mt-2">
-                  Adjust your filters or try searching again.
-                </p>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                Loading...
               </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <p className="text-red-600 mb-4">Failed to load folder</p>
+                <Button
+                  onClick={() =>
+                    queryClient.invalidateQueries({
+                      queryKey: ["children", parentId],
+                    })
+                  }
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : isEmpty ? (
+              selectedTypeFilter?.trim() !== "" ||
+              selectedUser?.trim() !== "" ? (
+                <div className="flex flex-col items-center justify-center h-full text-center text-gray-600">
+                  <img
+                    src="https://ssl.gstatic.com/docs/doclist/images/empty_state_recents_v4.svg"
+                    alt="No matching results"
+                    className="w-64 mb-6 opacity-80"
+                  />
+                  <h2 className="text-xl font-semibold">No matching results</h2>
+                  <p className="text-gray-500 mt-2">
+                    Adjust your filters or try searching again.
+                  </p>
+                </div>
+              ) : (
+                <div className="h-full">
+                  <EmptyState
+                    onUpload={() => fileInputRef.current?.click()}
+                    dragActive={dragActive}
+                    onCreateFolder={() => setCreateFolderModalOpen(true)}
+                  />
+                </div>
+              )
             ) : (
-              <EmptyState
-                onUpload={() => fileInputRef.current?.click()}
-                dragActive={dragActive}
-                onCreateFolder={() => setCreateFolderModalOpen(true)}
-              />
-            )
-          ) : (
-            <ScrollArea className="h-full w-full">
-              <div className="p-4">
-                {viewMode === "list" ? (
-                  <ListView
-                    items={items}
-                    onItemClick={handleItemClick}
-                    onRename={handleRename}
-                    onDelete={handleDelete}
-                    onDownload={handleDownload}
-                    onShowInfo={handleShowInfo}
-                    onAddTags={handleAddTags}
-                    onReupload={handleReupload}
-                  />
-                ) : (
-                  <GridView
-                    items={items}
-                    onItemClick={handleItemClick}
-                    onRename={handleRename}
-                    onDelete={handleDelete}
-                    onDownload={handleDownload}
-                    onShowInfo={handleShowInfo}
-                    onAddTags={handleAddTags}
-                    onReupload={handleReupload}
-                  />
-                )}
-              </div>
-            </ScrollArea>
-          )}
+              <ScrollArea className="h-full">
+                <div className="p-6">
+                  {viewMode === "list" ? (
+                    <ListView
+                      selectedIds={selectedIds}
+                      onSelectItem={handleItemSelection}
+                      items={items}
+                      onItemClick={handleItemClick}
+                      onRename={handleRename}
+                      onDelete={handleDelete}
+                      onDownload={handleDownload}
+                      onShowInfo={handleShowInfo}
+                      onAddTags={handleAddTags}
+                      onReupload={handleReupload}
+                    />
+                  ) : (
+                    <GridView
+                      items={items}
+                      selectedIds={selectedIds}
+                      onSelectItem={handleItemSelection}
+                      onItemClick={handleItemClick}
+                      onRename={handleRename}
+                      onDelete={handleDelete}
+                      onDownload={handleDownload}
+                      onShowInfo={handleShowInfo}
+                      onAddTags={handleAddTags}
+                      onReupload={handleReupload}
+                    />
+                  )}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          {/* Hidden file inputs */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={ALLOWED_EXTENSIONS.join(",")}
+            onChange={(e) => {
+              handleFileUpload(e.target.files);
+              e.target.value = "";
+            }}
+            className="hidden"
+          />
+
+          <input
+            ref={reuploadInputRef}
+            type="file"
+            accept={ALLOWED_EXTENSIONS.join(",")}
+            onChange={handleReuploadFileChange}
+            className="hidden"
+          />
+
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            onChange={(e) => {
+              handleFolderUpload(e.target.files);
+              e.target.value = "";
+            }}
+            className="hidden"
+          />
         </div>
 
-        {/* Hidden file inputs */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={ALLOWED_EXTENSIONS.join(",")}
-          onChange={(e) => {
-            handleFileUpload(e.target.files);
-            e.target.value = "";
-          }}
-          className="hidden"
-        />
-
-        <input
-          ref={reuploadInputRef}
-          type="file"
-          accept={ALLOWED_EXTENSIONS.join(",")}
-          onChange={handleReuploadFileChange}
-          className="hidden"
-        />
-
-        <input
-          ref={folderInputRef}
-          type="file"
-          // @ts-ignore
-          webkitdirectory=""
-          directory=""
-          multiple
-          onChange={(e) => {
-            handleFolderUpload(e.target.files);
-            e.target.value = "";
-          }}
-          className="hidden"
-        />
+        {/* Info Panel - Fixed Width */}
+        {showInfoPanel && (
+          <div className="w-[350px] flex-shrink-0 h-full overflow-hidden">
+            <FileInfoPanel
+              item={selectedItem}
+              selectionCount={
+                selectedIds.fileIds.length + selectedIds.folderIds.length
+              }
+              onClose={() => {
+                setShowInfoPanel(false);
+              }}
+            />
+          </div>
+        )}
       </div>
-
-      {/* Info Panel */}
-      {showInfoPanel && (
-        <FileInfoPanel
-          fileId={selectedFileId}
-          onClose={() => {
-            setShowInfoPanel(false);
-            setSelectedFileId(null);
-          }}
-        />
-      )}
 
       {/* Modals */}
       <CreateFolderModal
         open={createFolderModalOpen}
         onOpenChange={setCreateFolderModalOpen}
-        onConfirm={(data) =>
-          createFolderMutation.mutate({ ...data, parent_id: parentId || "" })
-        }
-        isLoading={createFolderMutation.isPending}
-      />
-
-      <RenameFolderModal
-        open={renameModalOpen && isFolder(selectedItem)}
-        onOpenChange={setRenameModalOpen}
-        item={selectedItem}
-        onConfirm={(data) => {
-          if (selectedItem) {
-            updateFolderMutation.mutate({
-              id: selectedItem._id,
-              name: data.name,
-              color: data.color,
+        onConfirm={async (data) => {
+          try {
+            await createFolderMutation.mutateAsync({
+              ...data,
+              parent_id: parentId || "",
             });
-            setRenameModalOpen(false);
+            setCreateFolderModalOpen(false);
+          } catch (error) {
+            console.error("Failed to create folder:", error);
           }
         }}
-        isLoading={updateFolderMutation.isPending}
+        isLoading={createFolderMutation.isPending}
       />
 
       <RenameDocumentModal
         open={renameModalOpen && !isFolder(selectedItem)}
         onOpenChange={setRenameModalOpen}
         item={selectedItem}
-        onConfirm={(data) => {
+        onConfirm={async (data) => {
           if (selectedItem) {
-            updateDocumentMutation.mutate({
-              id: selectedItem._id,
-              name: data.name,
-              description: data.description,
-            });
+            try {
+              await updateDocumentMutation.mutateAsync({
+                id: selectedItem._id,
+                name: data.name,
+                description: data.description,
+              });
+              setRenameModalOpen(false);
+            } catch (error) {
+              console.error("Failed to rename document:", error);
+            }
           }
         }}
         isLoading={updateDocumentMutation.isPending}
+      />
+
+      <RenameFolderModal
+        open={renameModalOpen && isFolder(selectedItem)}
+        onOpenChange={setRenameModalOpen}
+        item={selectedItem}
+        onConfirm={async (data) => {
+          if (selectedItem) {
+            try {
+              await updateFolderMutation.mutateAsync({
+                id: selectedItem._id,
+                name: data.name,
+                color: data.color,
+              });
+              setRenameModalOpen(false);
+            } catch (error) {
+              console.error("Failed to rename folder:", error);
+            }
+          }
+        }}
+        isLoading={updateFolderMutation.isPending}
       />
 
       <DeleteModal
@@ -680,69 +689,36 @@ export default function RightPanelView() {
         }
       />
 
+      <DepartmentModal
+        open={departmentModalOpen}
+        onOpenChange={(open) => {
+          setDepartmentModalOpen(open);
+          if (!open) {
+            setSelectedDepartment(null);
+          }
+        }}
+        mode={departmentModalMode}
+        department={selectedDepartment}
+        onSubmit={handleDepartmentSubmit}
+        isLoading={updateDepartmentMutation.isPending}
+      />
+
       <TagsModal
         open={tagsModalOpen}
         onOpenChange={setTagsModalOpen}
         item={selectedItem}
-        onConfirm={(tags) => {
+        onConfirm={async (tags) => {
           if (selectedItem) {
-            addTagsMutation.mutate({ id: selectedItem._id, tags });
-            setTagsModalOpen(false);
+            try {
+              await addTagsMutation.mutateAsync({ id: selectedItem._id, tags });
+              setTagsModalOpen(false);
+            } catch (error) {
+              console.error("Failed to add tags:", error);
+            }
           }
         }}
         isLoading={addTagsMutation.isPending}
       />
-    </div>
-  );
-}
-
-// EmptyState Component
-function EmptyState({
-  onUpload,
-  dragActive,
-  onCreateFolder,
-}: {
-  onUpload: () => void;
-  dragActive: boolean;
-  onCreateFolder: () => void;
-}) {
-  return (
-    <div
-      className="flex items-center justify-center h-full cursor-pointer hover:bg-gray-50 transition-colors"
-      onClick={onUpload}
-    >
-      <div
-        className={`text-center transition-all ${
-          dragActive ? "scale-105" : ""
-        }`}
-      >
-        <div className="mb-8">
-          <div className="w-48 h-48 mx-auto mb-4 flex items-center justify-center">
-            <Upload className="w-32 h-32 text-gray-400" />
-          </div>
-        </div>
-
-        <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-          {dragActive ? "Drop files here" : "Click anywhere to upload"}
-        </h2>
-        <p className="text-gray-600 mb-6">or drag and drop files</p>
-
-        <Button
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation();
-            onCreateFolder();
-          }}
-          className="mb-4"
-        >
-          <FolderPlus className="w-4 h-4 mr-2" />
-          Create Folder
-        </Button>
-
-        <p className="text-sm text-gray-500 mt-4">
-          Supported: PDF, DOCX, XLSX, JPG, PNG, ZIP (max 4GB)
-        </p>
-      </div>
     </div>
   );
 }

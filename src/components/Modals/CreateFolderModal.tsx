@@ -61,12 +61,12 @@ export default function CreateFolderModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] p-[30px] pb-4">
         <DialogHeader>
-          <DialogTitle>Create New Folder</DialogTitle>
-          <DialogDescription>
+          <DialogTitle>Create Folder</DialogTitle>
+          {/* <DialogDescription>
             Enter a name and choose a color for your new folder.
-          </DialogDescription>
+          </DialogDescription> */}
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -75,12 +75,13 @@ export default function CreateFolderModal({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Folder Name</FormLabel>
+                  {/* <FormLabel>Folder Name</FormLabel> */}
                   <FormControl>
                     <Input 
-                      placeholder="e.g., Marketing Materials" 
+                      placeholder="Folder Name" 
                       {...field}
                       disabled={isLoading} // ✅ Disable when loading
+                      className="h-12 border border-1 focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none "
                     />
                   </FormControl>
                   <FormMessage />
@@ -88,7 +89,7 @@ export default function CreateFolderModal({
               )}
             />
 
-            <FormField
+            {/* <FormField
               control={form.control}
               name="color"
               render={({ field }) => (
@@ -108,23 +109,24 @@ export default function CreateFolderModal({
                   <FormMessage />
                 </FormItem>
               )}
-            />
+            /> */}
 
             <DialogFooter>
               <Button 
                 type="button" 
-                variant="outline" 
+                variant="ghost" 
                 onClick={() => onOpenChange(false)}
                 disabled={isLoading} // ✅ Disable when loading
+                 className="hover:bg-[#035C4C] hover:text-[#fff]" 
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
-                className="bg-teal-500 hover:bg-teal-600"
+                className="bg-[#fff] text-[#035C4C] text-[14px] hover:bg-[#035C4C] hover:text-[#fff]" 
                 disabled={isLoading} // ✅ Disable when loading
               >
-                {isLoading ? "Creating..." : "Create Folder"} {/* ✅ Show loading state */}
+                {isLoading ? "Creating..." : "Create"} {/* ✅ Show loading state */}
               </Button>
             </DialogFooter>
           </form>
