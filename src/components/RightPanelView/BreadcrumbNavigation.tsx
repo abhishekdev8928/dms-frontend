@@ -1,8 +1,5 @@
 import React, { useState } from "react";
 import {
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
   FolderPlus,
   Edit,
   Download,

@@ -67,7 +67,7 @@ export default function GridView({
   };
 
   const isFolder = (item: FileItem): boolean => 
-    item.type === 'folder' || item.itemType === 'folder';
+    item.type === 'folder';
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>): void => {
     e.currentTarget.style.display = 'none';

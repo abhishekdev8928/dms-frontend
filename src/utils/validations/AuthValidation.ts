@@ -75,6 +75,17 @@ export const verifyOtpSchema = z.object({
 
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 
+
+export const superAdminCreateUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must not exceed 30 characters"),
+  email: z.string().email("Invalid email address"),
+  role: z.enum(["super_admin", "admin", "department_owner", "member_bank", "user"]),
+  departments: z.array(z.string()).optional(),
+});
+
+export type SuperAdminCreateUserInput = z.infer<typeof superAdminCreateUserSchema>;
+
+
 // ============================================================================
 // RESEND OTP SCHEMA
 // ============================================================================

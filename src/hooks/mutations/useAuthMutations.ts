@@ -1,8 +1,8 @@
 // src/hooks/auth/useAuthMutations.ts
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import Cookies from 'js-cookie';
-import { toast } from 'sonner'; // or your toast library
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import Cookies from "js-cookie";
+import { toast } from "sonner"; // or your toast library
 import {
   loginUser,
   verifyOtp,
@@ -13,9 +13,10 @@ import {
   resetPassword,
   changePassword,
   updateProfile,
-} from '@/config/api/authApi';
-import { useAuthStore } from '@/config/store/authStore';
-import { authKeys } from '../queries/useAuthQueries';
+  createUserBySuperAdmin,
+} from "@/config/api/authApi";
+import { useAuthStore } from "@/config/store/authStore";
+import { authKeys } from "../queries/useAuthQueries";
 import type {
   LoginResponse,
   VerifyOtpResponse,
@@ -26,7 +27,8 @@ import type {
   ResetPasswordResponse,
   ChangePasswordResponse,
   UpdateProfileResponse,
-} from '@/config/api/authApi';
+  CreateUserBySuperAdminResponse,
+} from "@/config/api/authApi";
 
 /**
  * Hook for user login
@@ -35,21 +37,23 @@ export const useLogin = () => {
   const navigate = useNavigate();
   const setUnverifiedUser = useAuthStore((state) => state.setUnverifiedUser);
 
-  return useMutation<LoginResponse, Error, { email: string; password: string }>({
-    mutationFn: loginUser,
-    onSuccess: (data) => {
-      // Set unverified user state
-      setUnverifiedUser(data.data.userId);
-      
-      toast.success(data.message);
-      // Navigate to OTP verification page
-      navigate(`/auth/verify-otp?userId=${data.data.userId}`);
-    },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'Login failed';
-      toast.error(message);
-    },
-  });
+  return useMutation<LoginResponse, Error, { email: string; password: string }>(
+    {
+      mutationFn: loginUser,
+      onSuccess: (data) => {
+        // Set unverified user state
+        setUnverifiedUser(data.data.userId);
+
+        toast.success(data.message);
+        // Navigate to OTP verification page
+        navigate(`/auth/verify-otp?userId=${data.data.userId}`);
+      },
+      onError: (error: any) => {
+        const message = error.response?.data?.message || "Login failed";
+        toast.error(message);
+      },
+    }
+  );
 };
 
 /**
@@ -57,29 +61,34 @@ export const useLogin = () => {
  */
 export const useVerifyOtp = () => {
   const navigate = useNavigate();
-  const setAuthenticatedUser = useAuthStore((state) => state.setAuthenticatedUser);
+  const setAuthenticatedUser = useAuthStore(
+    (state) => state.setAuthenticatedUser
+  );
 
-  return useMutation<VerifyOtpResponse, Error, { userId: string; otp: string }>({
-    mutationFn: verifyOtp,
-    onSuccess: (data) => {
-      // Set authenticated user (tokens are stored in cookies via the store)
-      setAuthenticatedUser({
-        userId: data.data.userId,
-        email: data.data.email,
-        username: data.data.username,
-        role: data.data.role,
-        accessToken: data.data.accessToken,
-        refreshToken: data.data.refreshToken,
-      });
+  return useMutation<VerifyOtpResponse, Error, { userId: string; otp: string }>(
+    {
+      mutationFn: verifyOtp,
+      onSuccess: (data) => {
+        // Set authenticated user (tokens are stored in cookies via the store)
+        setAuthenticatedUser({
+          userId: data.data.userId,
+          email: data.data.email,
+          username: data.data.username,
+          role: data.data.role,
+          accessToken: data.data.accessToken,
+          refreshToken: data.data.refreshToken,
+        });
 
-      toast.success(data.message);
-      navigate('/dashboard');
-    },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'OTP verification failed';
-      toast.error(message);
-    },
-  });
+        toast.success(data.message);
+        navigate("/dashboard");
+      },
+      onError: (error: any) => {
+        const message =
+          error.response?.data?.message || "OTP verification failed";
+        toast.error(message);
+      },
+    }
+  );
 };
 
 /**
@@ -92,7 +101,7 @@ export const useResendOtp = () => {
       toast.success(data.message);
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to resend OTP';
+      const message = error.response?.data?.message || "Failed to resend OTP";
       toast.error(message);
     },
   });
@@ -120,16 +129,16 @@ export const useLogout = () => {
       queryClient.clear();
 
       toast.success(data.message);
-      navigate('/auth/login');
+      navigate("/auth/login");
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Logout failed';
+      const message = error.response?.data?.message || "Logout failed";
       toast.error(message);
-      
+
       // Even on error, clear local auth state
       logout();
       queryClient.clear();
-      navigate('/auth/login');
+      navigate("/auth/login");
     },
   });
 };
@@ -151,10 +160,10 @@ export const useRefreshToken = () => {
       });
     },
     onError: (error: any) => {
-      console.error('Token refresh failed:', error);
+      console.error("Token refresh failed:", error);
       // Logout and redirect on refresh failure
       logout();
-      window.location.href = '/auth/login';
+      window.location.href = "/auth/login";
     },
   });
 };
@@ -169,7 +178,8 @@ export const useForgotPassword = () => {
       toast.success(data.message);
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to send reset email';
+      const message =
+        error.response?.data?.message || "Failed to send reset email";
       toast.error(message);
     },
   });
@@ -181,7 +191,9 @@ export const useForgotPassword = () => {
  */
 export const useResetPassword = () => {
   const navigate = useNavigate();
-  const setAuthenticatedUser = useAuthStore((state) => state.setAuthenticatedUser);
+  const setAuthenticatedUser = useAuthStore(
+    (state) => state.setAuthenticatedUser
+  );
 
   return useMutation<
     ResetPasswordResponse,
@@ -199,15 +211,15 @@ export const useResetPassword = () => {
         accessToken: data.data.accessToken,
         refreshToken: data.data.refreshToken,
       });
-      
+
       toast.success(data.message);
-      
+
       // Navigate to dashboard or use redirectTo from response
-      const redirectPath = data.data.redirectTo || '/dashboard';
+      const redirectPath = data.data.redirectTo || "/dashboard";
       navigate(redirectPath);
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Password reset failed';
+      const message = error.response?.data?.message || "Password reset failed";
       toast.error(message);
     },
   });
@@ -227,7 +239,7 @@ export const useChangePassword = () => {
       toast.success(data.message);
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Password change failed';
+      const message = error.response?.data?.message || "Password change failed";
       toast.error(message);
     },
   });
@@ -256,11 +268,46 @@ export const useUpdateProfile = () => {
     onSuccess: (data) => {
       // Invalidate profile query to refetch
       queryClient.invalidateQueries({ queryKey: authKeys.profile() });
-      
+
       toast.success(data.message);
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Profile update failed';
+      const message = error.response?.data?.message || "Profile update failed";
+      toast.error(message);
+    },
+  });
+};
+
+/**
+ * Hook for creating user by super admin
+ */
+export const useCreateUserBySuperAdmin = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    CreateUserBySuperAdminResponse,
+    Error,
+    {
+      username: string;
+      email: string;
+      role:
+        | "super_admin"
+        | "admin"
+        | "department_owner"
+        | "member_bank"
+        | "user";
+      departments?: string[];
+    }
+  >({
+    mutationFn: createUserBySuperAdmin,
+    onSuccess: (data) => {
+      // Invalidate users list query to refetch
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+
+      toast.success(data.message || "User created successfully");
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || "Failed to create user";
       toast.error(message);
     },
   });

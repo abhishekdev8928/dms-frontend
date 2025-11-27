@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+
+import React from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  FileText,
-  Folder,
   MoreVertical,
   Pencil,
   Trash2,
@@ -14,8 +13,6 @@ import {
   History,
   Activity,
   Tag,
-  ArrowUp,
-  ArrowDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +33,9 @@ import type { FileItem } from "@/types/documentTypes";
 
 interface ListViewProps {
   items: FileItem[];
+  sortField: "name" | "date";
+  sortOrder: "asc" | "desc";
+  onSort: (field: "name" | "date") => void;
   onItemClick: (item: FileItem) => void;
   onRename: (item: FileItem) => void;
   onDelete: (item: FileItem) => void;
@@ -43,6 +43,7 @@ interface ListViewProps {
   onShowInfo: (item: FileItem) => void;
   onAddTags: (item: FileItem) => void;
   onReupload: (documentId: string) => void;
+  onShare: (item: FileItem) => void; // ✅ Changed from id to FileItem
   selectedIds: {
     fileIds: string[];
     folderIds: string[];
@@ -54,11 +55,11 @@ interface ListViewProps {
   ) => void;
 }
 
-type SortField = "name" | "date";
-type SortOrder = "asc" | "desc";
-
 export default function ListView({
   items,
+  sortField,
+  sortOrder,
+  onSort,
   onItemClick,
   onRename,
   onDelete,
@@ -68,10 +69,8 @@ export default function ListView({
   onReupload,
   selectedIds,
   onSelectItem,
+  onShare
 }: ListViewProps) {
-  const [sortField, setSortField] = useState<SortField>("name");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
-
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString("en-US", {
       day: "numeric",
@@ -87,39 +86,6 @@ export default function ListView({
   };
 
   const isFolder = (item: FileItem) => item.type === "folder";
-
-  const handleSort = (field: SortField) => {
-    field === sortField
-      ? setSortOrder(sortOrder === "asc" ? "desc" : "asc")
-      : (setSortField(field), setSortOrder("asc"));
-  };
-
-  const getSortedItems = (): FileItem[] => {
-    const folders = items.filter((i) => i.type === "folder");
-    const files = items.filter((i) => i.type !== "folder");
-
-    const sortFn = (a: FileItem, b: FileItem) => {
-      if (sortField === "name") {
-        return sortOrder === "asc"
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name);
-      }
-      return sortOrder === "asc"
-        ? new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
-        : new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    };
-
-    return [...folders.sort(sortFn), ...files.sort(sortFn)];
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) =>
-    sortField === field ? (
-      sortOrder === "asc" ? (
-        <ArrowUp className="w-4 h-4" />
-      ) : (
-        <ArrowDown className="w-4 h-4" />
-      )
-    ) : null;
 
   const getInitials = (name: string) =>
     name
@@ -138,8 +104,6 @@ export default function ListView({
     };
   };
 
-  const sortedItems = getSortedItems();
-
   return (
     <div className="w-full">
       <TooltipProvider>
@@ -152,7 +116,7 @@ export default function ListView({
                     <TooltipTrigger asChild>
                       <th
                         className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer group"
-                        onClick={() => handleSort("name")}
+                        onClick={() => onSort("name")}
                       >
                         <div className="flex items-center gap-2 text-[16px] font-[600] text-[#035C4C]">
                           Name
@@ -173,9 +137,7 @@ export default function ListView({
                     </TooltipTrigger>
                     <TooltipContent>
                       {sortField === "name"
-                        ? `Click to sort ${
-                            sortOrder === "asc" ? "Z → A" : "A → Z"
-                          }`
+                        ? `Click to sort ${sortOrder === "asc" ? "Z → A" : "A → Z"}`
                         : "Sort A → Z"}
                     </TooltipContent>
                   </Tooltip>
@@ -188,7 +150,7 @@ export default function ListView({
                     <TooltipTrigger asChild>
                       <th
                         className="px-6 py-3 text-[16px] font-[400] text-left text-sm font-medium text-gray-700 cursor-pointer group w-48"
-                        onClick={() => handleSort("date")}
+                        onClick={() => onSort("date")}
                       >
                         <div className="flex items-center gap-2">
                           Date modified
@@ -199,18 +161,22 @@ export default function ListView({
                                 : "opacity-0 group-hover:opacity-100"
                             }`}
                           >
-                            <SortIcon field="date" />
+                            {sortOrder === "asc" ? (
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="#035C4C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            ) : (
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M6 10V2M6 10L3 7M6 10L9 7" stroke="#035C4C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
                           </span>
                         </div>
                       </th>
                     </TooltipTrigger>
                     <TooltipContent>
                       {sortField === "date"
-                        ? `Click to sort ${
-                            sortOrder === "asc"
-                              ? "Newest → Oldest"
-                              : "Oldest → Newest"
-                          }`
+                        ? `Click to sort ${sortOrder === "asc" ? "Newest → Oldest" : "Oldest → Newest"}`
                         : "Sort Oldest → Newest"}
                     </TooltipContent>
                   </Tooltip>
@@ -228,9 +194,8 @@ export default function ListView({
               </thead>
 
               <tbody className="divide-y divide-gray-100">
-                {sortedItems.map((item, index) => {
+                {items.map((item, index) => {
                   const creator = getCreatorInfo(item);
-
                   const isSelected =
                     item.type === "folder"
                       ? selectedIds.folderIds.includes(item._id)
@@ -267,9 +232,7 @@ export default function ListView({
                                 <path d="M10.8008 0.800052H2.80078C2.27035 0.800052 1.76164 1.01077 1.38657 1.38584C1.01149 1.76091 0.800781 2.26962 0.800781 2.80005V18.8001C0.800781 19.3305 1.01149 19.8392 1.38657 20.2143C1.76164 20.5893 2.27035 20.8001 2.80078 20.8001H14.8008C15.3312 20.8001 15.8399 20.5893 16.215 20.2143C16.5901 19.8392 16.8008 19.3305 16.8008 18.8001V6.80005M10.8008 0.800052C11.1173 0.799539 11.4309 0.861654 11.7233 0.982821C12.0158 1.10399 12.2813 1.28181 12.5048 1.50605L16.0928 5.09405C16.3176 5.31756 16.496 5.5834 16.6175 5.87621C16.739 6.16903 16.8013 6.48302 16.8008 6.80005M10.8008 0.800052V5.80005C10.8008 6.06527 10.9061 6.31962 11.0937 6.50716C11.2812 6.69469 11.5356 6.80005 11.8008 6.80005L16.8008 6.80005" stroke="#1E1E1E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                               <span className="text-sm font-medium text-gray-800 truncate">
-                                {item.extension
-                                  ? `${item.name}.${item.extension}`
-                                  : item.name}
+                                {item.extension ? `${item.name}.${item.extension}` : item.name}
                               </span>
                             </>
                           )}
@@ -353,10 +316,10 @@ export default function ListView({
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    toast.info("Coming soon");
+                                    onShare(item); // ✅ Pass the entire item
                                   }}
                                 >
-                                  <Users className="w-4 h-4 mr-2" /> Manage Access
+                                  <Users className="w-4 h-4 mr-2" /> Share 
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem
@@ -375,8 +338,7 @@ export default function ListView({
                                     to={`/dashboard/version-history/${item._id}`}
                                     className="flex items-center w-full"
                                   >
-                                    <History className="w-4 h-4 mr-2" /> Version
-                                    History
+                                    <History className="w-4 h-4 mr-2" /> Version History
                                   </Link>
                                 </DropdownMenuItem>
 

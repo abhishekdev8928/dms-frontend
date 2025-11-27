@@ -9,9 +9,10 @@ import AuthLayout from "@/components/layout/AuthLayout";
 import TrashScreen from "@/pages/Dashboard/RestorePage";
 import DashboardLayout from "../components/layout/DasboardLayout";
 import HomePage from "@/pages/Dashboard/HomePage";
-import RightPanelView from "@/pages/Dashboard/RightPanelPage";
+import RightPanelView from "@/pages/Dashboard/ExplorerViewPage";
 import NotFoundPage from "@/pages/Common/NotFoundPage";
 import  ForgetPasswordPage  from "@/pages/Auth/ForgotPasswordPage";
+import StarredPage from "@/pages/Dashboard/StarredPage";
 
 export const router = createBrowserRouter([
   // ================================
@@ -52,6 +53,10 @@ export const router = createBrowserRouter([
       {
         path: "restore",
         element: <TrashScreen />,
+      },
+       {
+        path: "starred",
+        element: <StarredPage />,
       },
     ],
   },

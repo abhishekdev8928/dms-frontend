@@ -8,6 +8,7 @@ import {
   refreshTokenSchema,
   changePasswordSchema,
   updateProfileSchema,
+  superAdminCreateUserSchema,
 } from "@/utils/validations/AuthValidation";
 
 /* =======================================================
@@ -30,6 +31,25 @@ import {
 //   const res = await httpClient.post("/auth/register", validated);
 //   return res.data;
 // };
+
+
+// frontend/src/config/auth.ts or wherever your auth API functions are
+
+/**
+ * Create new user by Super Admin
+ * Route: POST /api/admin/users
+ * Access: Super Admin only
+ */
+export const createUserBySuperAdmin = async (data: {
+  username: string;
+  email: string;
+  role: "super_admin" | "admin" | "department_owner" | "member_bank" | "user";
+  departments?: string[];
+}) => {
+  const validated = superAdminCreateUserSchema.parse(data);
+  const res = await httpClient.post("/auth/users", validated);
+  return res.data;
+};
 
 /**
  * Verify OTP after registration or login
@@ -250,6 +270,19 @@ export interface ResetPasswordResponse {
     redirectTo: string; // e.g., "/dashboard"
   };
 }
+
+export interface CreateUserBySuperAdminResponse {
+  success: boolean;
+  message: string;
+  data: {
+    userId: string;
+    username: string;
+    email: string;
+    role: string;
+    createdBy: string;
+  };
+}
+
 
 export interface ChangePasswordResponse {
   success: boolean;

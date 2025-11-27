@@ -1,593 +1,311 @@
-# Frontend Security Implementation Guide
+# RightPanelView Cleanup & Refactoring Guide
 
-## 🔐 Current Backend Security (Already Implemented)
-- ✅ XSS Protection with `sanitizeInputWithXSS`
-- ✅ NoSQL Injection Prevention
-- ✅ Zod Schema Validation
-- ✅ Authentication & Authorization
+A comprehensive guide to refactoring a bloated 600–900 line `RightPanelView.tsx` component into a clean, maintainable, and reusable architecture.
 
----
+## 📊 Overview
 
-## 🛡️ Essential Frontend Security Measures
+**Goal:** Transform the monolithic RightPanelView into a modular system of hooks and components, reducing the main file to ~150–200 lines while improving maintainability and reusability.
 
-### 1. **Content Security Policy (CSP)**
-**Why:** Prevents XSS attacks by controlling which resources can be loaded
+**Expected Outcome:**
+- 70–80% reduction in main component size
+- Modular, testable architecture
+- Reusable logic across the application
+- Easier debugging and feature additions
 
+## 📁 Project Structure
+
+```
+RightPanelView/
+├── RightPanelView.tsx
+├── components/
+│   ├── RightPanelHeader.tsx
+│   └── RightPanelContent.tsx
+├── hooks/
+│   ├── useUploadHandlers.ts
+│   ├── useItemActions.ts
+│   ├── useMultiSelect.ts
+│   ├── useModalState.ts
+│   ├── useDragAndDrop.ts
+│   ├── useBulkActions.ts
+│   └── useBreadcrumbNavigation.ts
+└── utils/
+    └── formatters.ts
+```
+
+## 🔧 Refactoring Steps
+
+### Step 1: Extract Upload Logic (`useUploadHandlers`)
+
+**Problem:** Upload logic is duplicated across file uploads, folder uploads, re-uploads, drag-and-drop, validations, toasts, and query invalidations.
+
+**Solution:** Create a centralized upload hook.
+
+**Hook API:**
 ```typescript
-// In your index.html or Next.js config
-<meta http-equiv="Content-Security-Policy" 
-      content="
-        default-src 'self';
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;
-        style-src 'self' 'unsafe-inline';
-        img-src 'self' data: https:;
-        font-src 'self' data:;
-        connect-src 'self' https://your-api.com;
-        frame-ancestors 'none';
-        base-uri 'self';
-        form-action 'self';
-      ">
-```
-
-**For React/Vite:**
-```typescript
-// vite.config.ts
-export default defineConfig({
-  server: {
-    headers: {
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline';"
-    }
-  }
-});
-```
-
----
-
-### 2. **Input Validation & Sanitization (Client-Side)**
-**Why:** First line of defense before data reaches backend
-
-```typescript
-// utils/validation.ts
-import DOMPurify from 'dompurify';
-
-/**
- * Sanitize HTML content to prevent XSS
- */
-export const sanitizeHTML = (dirty: string): string => {
-  return DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p'],
-    ALLOWED_ATTR: ['href']
-  });
-};
-
-/**
- * Validate and sanitize user input
- */
-export const sanitizeInput = (input: string): string => {
-  return input
-    .trim()
-    .replace(/[<>]/g, '') // Remove < and >
-    .slice(0, 1000); // Limit length
-};
-
-/**
- * Validate file upload
- */
-export const validateFile = (file: File) => {
-  const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-  const maxSize = 5 * 1024 * 1024; // 5MB
-
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error('Invalid file type');
-  }
-
-  if (file.size > maxSize) {
-    throw new Error('File too large');
-  }
-
-  return true;
-};
-```
-
-**Install DOMPurify:**
-```bash
-npm install dompurify
-npm install --save-dev @types/dompurify
-```
-
----
-
-### 3. **Secure Token Management**
-**Why:** Prevent token theft and unauthorized access
-
-```typescript
-// utils/auth.ts
-import Cookies from 'js-cookie';
-
-/**
- * Store token securely in httpOnly cookie (preferred)
- * Or use secure localStorage with encryption
- */
-export const tokenManager = {
-  // Option 1: Cookies (recommended)
-  setToken: (token: string) => {
-    Cookies.set('auth_token', token, {
-      expires: 7, // 7 days
-      secure: true, // HTTPS only
-      sameSite: 'strict',
-      path: '/'
-    });
-  },
-
-  getToken: (): string | undefined => {
-    return Cookies.get('auth_token');
-  },
-
-  removeToken: () => {
-    Cookies.remove('auth_token');
-  },
-
-  // Option 2: Encrypted localStorage (if cookies not possible)
-  setTokenEncrypted: (token: string) => {
-    const encrypted = btoa(token); // Use proper encryption in production
-    localStorage.setItem('_at', encrypted);
-  },
-
-  getTokenEncrypted: (): string | null => {
-    const encrypted = localStorage.getItem('_at');
-    return encrypted ? atob(encrypted) : null;
-  }
-};
-```
-
-**Install js-cookie:**
-```bash
-npm install js-cookie
-npm install --save-dev @types/js-cookie
-```
-
----
-
-### 4. **HTTP Security Headers (via API Interceptor)**
-**Why:** Add security headers to all requests
-
-```typescript
-// httpClient.ts
-import axios from 'axios';
-import { tokenManager } from './utils/auth';
-
-const httpClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
-    'X-XSS-Protection': '1; mode=block',
-    'Referrer-Policy': 'strict-origin-when-cross-origin'
-  },
-  withCredentials: true // Send cookies with requests
-});
-
-// Request interceptor - Add auth token
-httpClient.interceptors.request.use(
-  (config) => {
-    const token = tokenManager.getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor - Handle auth errors
-httpClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      tokenManager.removeToken();
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-export default httpClient;
-```
-
----
-
-### 5. **Rate Limiting (Client-Side)**
-**Why:** Prevent abuse and brute force attacks
-
-```typescript
-// utils/rateLimiter.ts
-class RateLimiter {
-  private attempts: Map<string, number[]> = new Map();
-
-  canAttempt(key: string, maxAttempts: number, windowMs: number): boolean {
-    const now = Date.now();
-    const attempts = this.attempts.get(key) || [];
-    
-    // Remove old attempts outside the window
-    const recentAttempts = attempts.filter(time => now - time < windowMs);
-    
-    if (recentAttempts.length >= maxAttempts) {
-      return false;
-    }
-    
-    recentAttempts.push(now);
-    this.attempts.set(key, recentAttempts);
-    return true;
-  }
-
-  reset(key: string): void {
-    this.attempts.delete(key);
-  }
+{
+  uploadFiles: (files: File[]) => Promise<void>
+  uploadFolder: (files: FileList) => Promise<void>
+  reuploadFile: (fileId: string, file: File) => Promise<void>
+  validateFileType: (file: File) => boolean
+  formatError: (error: unknown) => string
+  showToast: (message: string, type: 'success' | 'error') => void
 }
-
-export const rateLimiter = new RateLimiter();
-
-// Usage in login form
-const handleLogin = async (email: string, password: string) => {
-  if (!rateLimiter.canAttempt('login', 5, 60000)) { // 5 attempts per minute
-    toast.error('Too many login attempts. Please try again later.');
-    return;
-  }
-
-  try {
-    await loginUser(email, password);
-    rateLimiter.reset('login');
-  } catch (error) {
-    console.error('Login failed:', error);
-  }
-};
 ```
+
+**Benefits:**
+- Removes ~150 lines from RightPanelView
+- Reusable across Sidebar, Upload Modal, and Bulk Restore
+- Centralized error handling and validation
 
 ---
 
-### 6. **Secure File Upload**
-**Why:** Prevent malicious file uploads
+### Step 2: Extract Multi-Select Logic (`useMultiSelect`)
 
+**Problem:** Selection state management is scattered with mixed concerns for shift-select, cmd-select, and single selection.
+
+**Solution:** Isolate selection logic in a dedicated hook.
+
+**Hook API:**
 ```typescript
-// utils/fileUpload.ts
-export const secureFileUpload = {
-  /**
-   * Validate file before upload
-   */
-  validateFile: (file: File) => {
-    // Check file extension
-    const allowedExtensions = ['pdf', 'docx', 'xlsx', 'jpg', 'jpeg', 'png', 'zip'];
-    const fileExt = file.name.split('.').pop()?.toLowerCase();
-    
-    if (!fileExt || !allowedExtensions.includes(fileExt)) {
-      throw new Error(`Invalid file extension. Allowed: ${allowedExtensions.join(', ')}`);
-    }
-
-    // Check MIME type
-    const allowedMimeTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'image/jpeg',
-      'image/png'
-    ];
-
-    if (!allowedMimeTypes.includes(file.type)) {
-      throw new Error('Invalid file type');
-    }
-
-    // Check file size (5GB max)
-    const maxSize = 5 * 1024 * 1024 * 1024;
-    if (file.size > maxSize) {
-      throw new Error('File size exceeds 5GB limit');
-    }
-
-    // Check for double extensions (e.g., file.pdf.exe)
-    const nameParts = file.name.split('.');
-    if (nameParts.length > 2) {
-      throw new Error('Invalid file name format');
-    }
-
-    return true;
-  },
-
-  /**
-   * Sanitize filename
-   */
-  sanitizeFilename: (filename: string): string => {
-    return filename
-      .replace(/[^a-zA-Z0-9.-]/g, '_') // Replace special chars
-      .replace(/\.+/g, '.') // Remove multiple dots
-      .slice(0, 255); // Limit length
-  }
-};
-```
-
----
-
-### 7. **Environment Variable Protection**
-**Why:** Keep sensitive data out of bundle
-
-```typescript
-// .env.example
-VITE_API_URL=https://api.example.com
-VITE_APP_NAME=MyApp
-# Never commit actual .env file!
-
-// vite-env.d.ts
-/// <reference types="vite/client" />
-
-interface ImportMetaEnv {
-  readonly VITE_API_URL: string;
-  readonly VITE_APP_NAME: string;
+{
+  selectedIds: Set<string>
+  lastSelectedIndex: number | null
+  selectItem: (id: string, index: number, modifiers: SelectModifiers) => void
+  clearSelection: () => void
 }
+```
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
+**Benefits:**
+- Removes 40–60 lines of coupled UI and state logic
+- Reusable in ListView, GridView, and TableView
+- Simplified selection behavior
+
+---
+
+### Step 3: Extract File/Folder Actions (`useItemActions`)
+
+**Problem:** Action handlers (download, rename, delete, tag, navigate) are mixed with UI logic.
+
+**Solution:** Create a hook for all item-level operations.
+
+**Hook API:**
+```typescript
+{
+  handleDownload: (itemId: string) => Promise<void>
+  handleRename: (itemId: string, newName: string) => Promise<void>
+  handleDelete: (itemId: string) => Promise<void>
+  handleAddTags: (itemId: string, tags: string[]) => Promise<void>
+  handleShowInfo: (itemId: string) => void
+  navigateToFolder: (folderId: string) => void
 }
-
-// Usage
-const apiUrl = import.meta.env.VITE_API_URL;
-
-// .gitignore
-.env
-.env.local
-.env.production
 ```
+
+**Benefits:**
+- Clean, readable component code
+- Actions reusable across all views
+- Centralized mutation logic
 
 ---
 
-### 8. **Prevent Sensitive Data Exposure**
-**Why:** Don't log or expose sensitive information
+### Step 4: Extract Modal State Management (`useModalState`)
 
+**Problem:** Multiple `useState` declarations for each modal create clutter and repetition.
+
+**Solution:** Unified modal state management.
+
+**Hook API:**
 ```typescript
-// utils/logger.ts
-export const logger = {
-  error: (message: string, error?: any) => {
-    // Don't log tokens, passwords, or sensitive data
-    const sanitizedError = error ? {
-      message: error.message,
-      status: error.status,
-      // Remove sensitive fields
-    } : undefined;
-    
-    console.error(message, sanitizedError);
-    
-    // Send to monitoring service (not actual error object)
-    if (import.meta.env.PROD) {
-      // sendToMonitoring(message);
-    }
-  },
-
-  info: (message: string) => {
-    if (import.meta.env.DEV) {
-      console.log(message);
-    }
-  }
-};
-
-// Never do this:
-// console.log('User token:', token); ❌
-// console.log('Password:', password); ❌
-```
-
----
-
-### 9. **Protected Routes & Authorization**
-**Why:** Ensure only authenticated users access protected pages
-
-```typescript
-// components/ProtectedRoute.tsx
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-  requiredRole?: string[];
+{
+  modals: Record<ModalType, boolean>
+  openModal: (type: ModalType, item?: Item) => void
+  closeModal: (type: ModalType) => void
+  selectedItem: Item | null
+  setSelectedItem: (item: Item | null) => void
 }
-
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requiredRole 
-}) => {
-  const { isAuthenticated, user, loading } = useAuth();
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (requiredRole && !requiredRole.includes(user?.role)) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-// Usage in routes
-<Route 
-  path="/admin" 
-  element={
-    <ProtectedRoute requiredRole={['admin']}>
-      <AdminDashboard />
-    </ProtectedRoute>
-  } 
-/>
 ```
+
+**Benefits:**
+- Removes 20–30 lines of repeated state declarations
+- Easy to add new modals
+- Cleaner modal handling pattern
 
 ---
 
-### 10. **CSRF Protection**
-**Why:** Prevent Cross-Site Request Forgery attacks
+### Step 5: Extract Drag & Drop Logic (`useDragAndDrop`)
 
+**Problem:** DnD logic mixes UI highlighting, drop handling, upload logic, and type detection.
+
+**Solution:** Encapsulate all drag-and-drop functionality.
+
+**Hook API:**
 ```typescript
-// Add CSRF token to requests (if backend supports it)
-httpClient.interceptors.request.use((config) => {
-  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-  if (csrfToken) {
-    config.headers['X-CSRF-Token'] = csrfToken;
-  }
-  return config;
-});
+{
+  isDragging: boolean
+  handleDragEnter: (e: DragEvent) => void
+  handleDragLeave: (e: DragEvent) => void
+  handleDragOver: (e: DragEvent) => void
+  handleDrop: (e: DragEvent) => void
+}
 ```
+
+**Benefits:**
+- Cleaner UI component
+- Reusable in empty states, list views, and folder views
+- Isolated DnD complexity
 
 ---
 
-### 11. **Dependency Security**
-**Why:** Prevent vulnerabilities from third-party packages
+### Step 6: Extract Header Component (`RightPanelHeader`)
 
-```bash
-# Regular security audits
-npm audit
-npm audit fix
+**Problem:** Header logic (breadcrumbs, view toggle, info toggle, create folder) clutters the main component.
 
-# Use tools
-npm install -g snyk
-snyk test
-snyk monitor
+**Solution:** Separate header component.
 
-# Keep dependencies updated
-npm outdated
-npm update
-
-# Check for known vulnerabilities
-npx depcheck
-```
-
----
-
-### 12. **Secure Form Handling**
-**Why:** Prevent form-based attacks
-
+**Component Props:**
 ```typescript
-// components/SecureForm.tsx
-import { useState } from 'react';
-import { sanitizeInput } from '../utils/validation';
-
-export const SecureForm = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    message: ''
-  });
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    
-    // Sanitize input on change
-    const sanitizedValue = sanitizeInput(value);
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: sanitizedValue
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Additional validation before submit
-    if (!formData.name.trim() || !formData.email.trim()) {
-      toast.error('All fields are required');
-      return;
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast.error('Invalid email format');
-      return;
-    }
-
-    try {
-      await submitForm(formData);
-    } catch (error) {
-      logger.error('Form submission failed', error);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="text"
-        name="name"
-        value={formData.name}
-        onChange={handleChange}
-        maxLength={255}
-        required
-        autoComplete="off"
-      />
-      {/* Add more fields */}
-    </form>
-  );
-};
+{
+  viewMode: 'list' | 'grid'
+  setViewMode: (mode: ViewMode) => void
+  showInfoPanel: boolean
+  setShowInfoPanel: (show: boolean) => void
+  breadcrumbs: Breadcrumb[]
+  onBreadcrumbClick: (id: string) => void
+  onCreateFolder: () => void
+}
 ```
 
+**Benefits:**
+- Moves 60–80 lines out of main component
+- Reusable header across different panels
+- Improved readability
+
 ---
 
-## 📦 Required NPM Packages
+### Step 7: Extract Content Component (`RightPanelContent`)
 
-```bash
-# Security packages
-npm install dompurify js-cookie helmet
+**Problem:** Main content area mixes list view, grid view, empty state, loading states, and selection visuals.
 
-# TypeScript types
-npm install --save-dev @types/dompurify @types/js-cookie
+**Solution:** Dedicated content component.
+
+**Component Props:**
+```typescript
+{
+  items: Item[]
+  isLoading: boolean
+  error: Error | null
+  selectedIds: Set<string>
+  onSelectItem: (id: string, index: number, modifiers: SelectModifiers) => void
+  onItemClick: (item: Item) => void
+  viewMode: 'list' | 'grid'
+}
 ```
 
----
-
-## 🎯 Security Checklist
-
-- [ ] Implement Content Security Policy (CSP)
-- [ ] Client-side input validation & sanitization
-<!-- - [ ] Secure token storage (httpOnly cookies) -->
-- [ ] Add security headers to HTTP client
-- [ ] Implement rate limiting
-- [ ] Validate file uploads
-<!-- - [ ] Protect environment variables -->
-- [ ] Remove sensitive data from logs
-<!-- - [ ] Protected routes with authentication -->
-<!-- - [ ] CSRF protection -->
-- [ ] Regular dependency audits
-- [ ] Secure form handling
-<!-- - [ ] HTTPS only in production -->
-- [ ] Disable browser autocomplete for sensitive fields
-<!-- - [ ] Implement timeout for inactive sessions -->
+**Benefits:**
+- RightPanelView becomes UI-only orchestrator
+- Content rendering logic is reusable
+- Easy to implement infinite scroll later
 
 ---
 
-## 🚀 Production Deployment Checklist
+### Step 8: Extract Bulk Actions (`useBulkActions`)
 
-1. **Build optimizations:**
-   ```bash
-   npm run build
-   ```
+**Problem:** Bulk toolbar logic (delete, download, tag) with conditional rendering scattered throughout.
 
-2. **Security headers in production server:**
-   ```nginx
-   # nginx.conf
-   add_header X-Frame-Options "DENY";
-   add_header X-Content-Type-Options "nosniff";
-   add_header X-XSS-Protection "1; mode=block";
-   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-   ```
+**Solution:** Centralized bulk operations hook.
 
-3. **Enable HTTPS only**
-4. **Set secure cookies**
-5. **Minify and obfuscate code**
-6. **Remove console.logs**
-7. **Enable error monitoring** (Sentry, LogRocket)
+**Hook API:**
+```typescript
+{
+  bulkDelete: () => Promise<void>
+  bulkDownload: () => Promise<void>
+  bulkTag: (tags: string[]) => Promise<void>
+  canDelete: boolean
+  canDownload: boolean
+  canTag: boolean
+  selectedCount: number
+}
+```
+
+**Benefits:**
+- Removes 30–40 lines from main component
+- Simplified multi-select UX
+- Reusable bulk operations
 
 ---
 
-## 🔍 Additional Resources
+### Step 9: Extract Breadcrumb Utility (`useBreadcrumbNavigation`)
 
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [MDN Web Security](https://developer.mozilla.org/en-US/docs/Web/Security)
-- [Content Security Policy Guide](https://content-security-policy.com/)
-- [npm Security Best Practices](https://docs.npmjs.com/auditing-package-dependencies-for-security-vulnerabilities)
+**Problem:** Breadcrumb generation is duplicated across header, navigation, folder view, and files page.
+
+**Solution:** Create a shared utility or hook.
+
+**Utility/Hook API:**
+```typescript
+{
+  breadcrumbs: Breadcrumb[]
+  navigateTo: (id: string) => void
+  generateBreadcrumbs: (currentPath: string) => Breadcrumb[]
+}
+```
+
+**Benefits:**
+- Consistent breadcrumbs everywhere
+- DRY principle applied
+- Cleaner header component
+
+---
+
+## 📋 Implementation Order
+
+Follow this sequence for optimal refactoring:
+
+1. ✅ `useUploadHandlers` - Foundation for file operations
+2. ✅ `useMultiSelect` - Selection state management
+3. ✅ `useItemActions` - Item-level operations
+4. ✅ `useModalState` - Modal management
+5. ✅ `useDragAndDrop` - Drag-and-drop functionality
+6. ✅ `RightPanelHeader` - Header component extraction
+7. ✅ `RightPanelContent` - Content component extraction
+8. ✅ `useBulkActions` - Bulk operations
+9. ✅ `useBreadcrumbNavigation` - Breadcrumb utility
+
+## ✨ Final Result
+
+After completing all steps:
+
+- **Main Component:** ~150–200 lines (down from 600–900)
+- **Modularity:** 9 clean, focused hooks
+- **Components:** 2–3 presentational components
+- **Reusability:** Logic available across entire application
+- **Maintainability:** Easy to understand, test, and extend
+- **Scalability:** Future features are 10× easier to implement
+
+## 🎯 Key Benefits
+
+| Aspect | Before | After |
+|--------|--------|-------|
+| Lines of Code | 600–900 | 150–200 |
+| Testability | Difficult | Easy |
+| Reusability | None | High |
+| Maintainability | Low | High |
+| Debugging | Complex | Simple |
+
+## 🚀 Getting Started
+
+1. Create the folder structure as outlined above
+2. Follow the implementation order
+3. Extract one hook/component at a time
+4. Test thoroughly after each extraction
+5. Update imports in the main component
+
+## 📝 Notes
+
+- Each hook should be independent and focused on a single responsibility
+- Components should be presentational and receive all data via props
+- Use TypeScript for type safety throughout
+- Write unit tests for each hook and component
+- Document complex logic with inline comments
+
+---
+
+**Happy Refactoring! 🎉**
