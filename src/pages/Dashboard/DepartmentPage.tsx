@@ -249,9 +249,10 @@ const DepartmentManagement = () => {
   }
 
   return (
-    <div className="space-y-6 px-2">
+        <div className="h-full flex flex-col py-4 pe-4">
+
       {/* Search and Filter Bar */}
-      <div className="flex w-full items-center pt-4 gap-4">
+      {/* <div className="flex w-full items-center pt-4 gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -281,11 +282,8 @@ const DepartmentManagement = () => {
             <SelectItem value="50">50 per page</SelectItem>
           </SelectContent>
         </Select>
-        <Button onClick={handleAdd}>
-          <CirclePlus className="mr-2 h-4 w-4" />
-          Add Department
-        </Button>
-      </div>
+       
+      </div> */}
 
       {/* Table */}
       {isLoading ? (
@@ -309,7 +307,13 @@ const DepartmentManagement = () => {
           )}
         </div>
       ) : (
-        <div className="">
+
+ <div className="flex-1 flex gap-4 overflow-hidden">
+        {/* Main Content Area */}
+        <div className="flex-1 bg-white rounded-2xl p-6 shadow-sm flex flex-col overflow-hidden">
+          <h1 className="text-2xl font-semibold text-gray-900 pb-4">Department</h1>
+
+
           <Table>
             <TableHeader>
               <TableRow className="border-b hover:bg-transparent">
@@ -425,10 +429,11 @@ const DepartmentManagement = () => {
             </TableBody>
           </Table>
         </div>
+        </div>
       )}
 
       {/* Pagination */}
-      {departments.length > 0 && (
+      {/* {departments.length > 0 && (
         <div className="flex items-center justify-between bg-white p-4 rounded-lg border">
           <p className="text-sm text-muted-foreground">
             Showing{" "}
@@ -490,7 +495,7 @@ const DepartmentManagement = () => {
             </Button>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Add/Edit Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>

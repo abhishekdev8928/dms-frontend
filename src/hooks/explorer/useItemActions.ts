@@ -45,7 +45,7 @@ export const useItemActions = (
     }
   };
 
-  const handleShowInfo = (item: FileItem) => {
+  const handleShowInfo = (item: FileItem ) => {
     setSelectedFileId(item._id);
     setSelectedItem(item);
     toggleInfoPanel(); // ✅ Use toggleInfoPanel instead of setShowInfoPanel(true)

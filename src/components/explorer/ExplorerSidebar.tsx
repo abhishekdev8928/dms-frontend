@@ -18,6 +18,7 @@ import {
   FileText,
   Home,
   Package2,
+  Star,
 } from "lucide-react";
 import { IconRestore } from "@tabler/icons-react";
 import { LucideBuilding2 } from "lucide-react";
@@ -384,14 +385,14 @@ export const ExplorerSidebar = () => {
         <div
           onClick={() => handleRowClick(node)}
           className={`flex items-center gap-2 py-0 px-3 rounded-lg cursor-pointer transition-all hover:text-primary ${
-            isActive ? "bg-muted text-primary" : "text-muted-foreground"
+            isActive ? "bg-[#F6FFFD] text-primary" : "text-muted-foreground"
           }`}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
         >
           {hasChildren ? (
             <ChevronRight
               className={`w-4 h-4 transition-transform ${
-                isExpanded ? "rotate-90" : ""
+                isExpanded ? "rotate-90 " : ""
               }`}
             />
           ) : (
@@ -546,7 +547,7 @@ export const ExplorerSidebar = () => {
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="start" className="w-[240px] p-[10px]">
-                <DropdownMenuItem
+                {/* <DropdownMenuItem
                   className="py-2 cursor-pointer hover:bg-[#F6FFFD] mb-1"
                   onClick={() => setIsUserModalOpen(true)}
                 >
@@ -575,7 +576,7 @@ export const ExplorerSidebar = () => {
                   <div className="flex-1">
                     <div className="text-[16px] roboto">Add Users</div>
                   </div>
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
 
                 <DropdownMenuItem
                   className={`py-2 cursor-pointer ${
@@ -689,7 +690,7 @@ export const ExplorerSidebar = () => {
                   </div>
                 </DropdownMenuItem>
 
-                {/* <div className="h-px bg-gray-200 my-1" /> */}
+
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -702,7 +703,7 @@ export const ExplorerSidebar = () => {
                 to="/dashboard/home"
                 className={({ isActive }) =>
                   `flex items-center text-[16px] text-[#1E1E1E] gap-3 rounded-lg px-3 py-2  transition-all hover:text-primary ${
-                    isActive ? " " : ""
+                    isActive ? " bg-[#F6FFFD]" : ""
                   }`
                 }
               >
@@ -729,7 +730,7 @@ export const ExplorerSidebar = () => {
                 to="/dashboard/department"
                 className={({ isActive }) =>
                   `flex items-center text-[16px] text-[#1E1E1E] gap-3 rounded-lg px-3 py-2  transition-all hover:text-primary ${
-                    isActive ? " " : ""
+                    isActive ? "bg-[#F6FFFD] " : ""
                   }`
                 }
               >
@@ -755,7 +756,7 @@ export const ExplorerSidebar = () => {
                 to="/dashboard/restore"
                 className={({ isActive }) =>
                   `flex items-center text-[16px] text-[#1E1E1E] gap-3 rounded-lg px-3 py-2  transition-all hover:text-primary ${
-                    isActive ? " " : ""
+                    isActive ? "bg-[#F6FFFD] " : ""
                   }`
                 }
               >
@@ -774,7 +775,7 @@ export const ExplorerSidebar = () => {
                     stroke-linejoin="round"
                   />
                 </svg>
-                {/* <IconRestore className="h-4 w-4" /> */}
+                {/* <IconRestore className="h-6 w-4" /> */}
                 Restore
               </NavLink>
 
@@ -782,25 +783,11 @@ export const ExplorerSidebar = () => {
                 to="/dashboard/starred"
                 className={({ isActive }) =>
                   `flex items-center text-[16px] text-[#1E1E1E] gap-3 rounded-lg px-3 py-2  transition-all hover:text-primary ${
-                    isActive ? " " : ""
+                    isActive ? "bg-[#F6FFFD] " : ""
                   }`
                 }
               >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M1 10C1 11.78 1.52784 13.5201 2.51677 15.0001C3.50571 16.4802 4.91131 17.6337 6.55585 18.3149C8.20038 18.9961 10.01 19.1743 11.7558 18.8271C13.5016 18.4798 15.1053 17.6226 16.364 16.364C17.6226 15.1053 18.4798 13.5016 18.8271 11.7558C19.1743 10.01 18.9961 8.20038 18.3149 6.55585C17.6337 4.91131 16.4802 3.50571 15.0001 2.51677C13.5201 1.52784 11.78 1 10 1C7.48395 1.00947 5.06897 1.99122 3.26 3.74L1 6M1 6V1M1 6H6M10 5V10L14 12"
-                    stroke="#1E1E1E"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+                <Star className="h-6 w-6" />
                 {/* <IconRestore className="h-4 w-4" /> */}
                 Starred
               </NavLink>

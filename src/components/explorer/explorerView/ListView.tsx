@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -13,6 +12,9 @@ import {
   History,
   Activity,
   Tag,
+  FolderInput,
+  Star,
+  StarOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +23,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
@@ -28,6 +33,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useMutationAddStarred, useMutationRemoveStarred } from "@/hooks/mutations/useStarredMutation";
 
 import type { FileItem } from "@/types/documentTypes";
 
@@ -43,7 +49,8 @@ interface ListViewProps {
   onShowInfo: (item: FileItem) => void;
   onAddTags: (item: FileItem) => void;
   onReupload: (documentId: string) => void;
-  onShare: (item: FileItem) => void; // ✅ Changed from id to FileItem
+  onShare: (item: FileItem) => void;
+  onMove?: (item: FileItem) => void;
   selectedIds: {
     fileIds: string[];
     folderIds: string[];
@@ -69,8 +76,38 @@ export default function ListView({
   onReupload,
   selectedIds,
   onSelectItem,
-  onShare
+  onShare,
+  onMove,
 }: ListViewProps) {
+  // Starred mutations
+  const addStarred = useMutationAddStarred({
+    onSuccess: (data) => {
+      toast.success(data.message || "Added to starred successfully");
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to add to starred");
+    },
+  });
+
+  const removeStarred = useMutationRemoveStarred({
+    onSuccess: (data) => {
+      toast.success(data.message || "Removed from starred successfully");
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to remove from starred");
+    },
+  });
+
+  const handleToggleStarred = (item: FileItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (item.starred) {
+      removeStarred.mutate({ id: item._id, type: item.type });
+    } else {
+      addStarred.mutate({ id: item._id, type: item.type });
+    }
+  };
+
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString("en-US", {
       day: "numeric",
@@ -273,6 +310,38 @@ export default function ListView({
                           </DropdownMenuTrigger>
 
                           <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <FolderInput className="w-4 h-4 mr-2" /> Organize
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onMove?.(item);
+                                  }}
+                                >
+                                  <FolderInput className="w-4 h-4 mr-2" /> Move
+                                </DropdownMenuItem>
+                                
+                                {/* Dynamic Starred Menu Item */}
+                                <DropdownMenuItem
+                                  onClick={(e) => handleToggleStarred(item, e)}
+                                  disabled={addStarred.isPending || removeStarred.isPending}
+                                >
+                                  {item.starred ? (
+                                    <>
+                                      <StarOff className="w-4 h-4 mr-2" /> Remove from Starred
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Star className="w-4 h-4 mr-2" /> Add to Starred
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -316,7 +385,7 @@ export default function ListView({
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onShare(item); // ✅ Pass the entire item
+                                    onShare(item);
                                   }}
                                 >
                                   <Users className="w-4 h-4 mr-2" /> Share 
@@ -345,7 +414,8 @@ export default function ListView({
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    toast.info("Coming soon");
+                                    onShowInfo(item , "activity");
+                                    
                                   }}
                                 >
                                   <Activity className="w-4 h-4 mr-2" /> Activity

@@ -1,173 +1,87 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  toggleStarredItem,
-  addStarredItem,
-  removeStarredItem,
-  bulkToggleStarredItems,
-} from '@/config/api/starredApi';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { addStarredItem, removeStarredItem, bulkUpdateStarred } from "@/config/api/starredApi";
+
+interface StarredPayload {
+  id: string;
+  type: "folder" | "file";
+}
+
+interface BulkStarredPayload {
+  fileIds: string[];
+  folderIds: string[];
+  starred: boolean;
+}
+
+interface MutationCallbacks {
+  onSuccess?: (data: any) => void;
+  onError?: (error: any) => void;
+}
 
 /**
- * Hook for toggling starred status of a single item
- * @param {Object} options - Mutation options
- * @returns {Object} Mutation object
+ * Mutation for adding a single item to starred
  */
-export const useMutationToggleStarred = (options = {}) => {
+export const useMutationAddStarred = (callbacks?: MutationCallbacks) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: toggleStarredItem,
-    onSuccess: (data, variables) => {
-      // Invalidate starred items list
-      queryClient.invalidateQueries({ queryKey: ['starred-items'] });
-      
-      // Invalidate the specific item query if it exists
-      queryClient.invalidateQueries({ 
-        queryKey: [variables.type === 'folder' ? 'folder' : 'file', variables.id] 
-      });
-      
-      // Invalidate folder/file lists
-      queryClient.invalidateQueries({ queryKey: ['folders'] });
-      queryClient.invalidateQueries({ queryKey: ['files'] });
-      
-      options.onSuccess?.(data, variables);
-    },
-    onError: (error, variables, context) => {
-      options.onError?.(error, variables, context);
-    },
-    ...options,
-  });
-};
-
-/**
- * Hook for adding starred status to a single item
- * @param {Object} options - Mutation options
- * @returns {Object} Mutation object
- */
-export const useMutationAddStarred = (options = {}) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: addStarredItem,
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['starred-items'] });
-      queryClient.invalidateQueries({ 
-        queryKey: [variables.type === 'folder' ? 'folder' : 'file', variables.id] 
-      });
-      queryClient.invalidateQueries({ queryKey: ['folders'] });
-      queryClient.invalidateQueries({ queryKey: ['files'] });
-      
-      options.onSuccess?.(data, variables);
-    },
-    onError: (error, variables, context) => {
-      options.onError?.(error, variables, context);
-    },
-    ...options,
-  });
-};
-
-/**
- * Hook for removing starred status from a single item
- * @param {Object} options - Mutation options
- * @returns {Object} Mutation object
- */
-export const useMutationRemoveStarred = (options = {}) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: removeStarredItem,
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['starred-items'] });
-      queryClient.invalidateQueries({ 
-        queryKey: [variables.type === 'folder' ? 'folder' : 'file', variables.id] 
-      });
-      queryClient.invalidateQueries({ queryKey: ['folders'] });
-      queryClient.invalidateQueries({ queryKey: ['files'] });
-      
-      options.onSuccess?.(data, variables);
-    },
-    onError: (error, variables, context) => {
-      options.onError?.(error, variables, context);
-    },
-    ...options,
-  });
-};
-
-/**
- * Hook for bulk toggling starred status of multiple items
- * @param {Object} options - Mutation options
- * @returns {Object} Mutation object
- */
-export const useMutationBulkToggleStarred = (options = {}) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: bulkToggleStarredItems,
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['starred-items'] });
-      queryClient.invalidateQueries({ queryKey: ['folders'] });
-      queryClient.invalidateQueries({ queryKey: ['files'] });
-      
-      // Invalidate each individual item
-      variables.items?.forEach(item => {
-        queryClient.invalidateQueries({ 
-          queryKey: [item.type === 'folder' ? 'folder' : 'file', item.id] 
-        });
-      });
-      
-      options.onSuccess?.(data, variables);
-    },
-    onError: (error, variables, context) => {
-      options.onError?.(error, variables, context);
-    },
-    ...options,
-  });
-};
-
-// Usage example:
-/*
-import { 
-  useMutationToggleStarred, 
-  useMutationAddStarred,
-  useMutationRemoveStarred,
-  useMutationBulkToggleStarred 
-} from './useMutationStarred';
-
-function MyComponent() {
-  const toggleStarred = useMutationToggleStarred({
+    mutationFn: (payload: StarredPayload) => addStarredItem(payload),
     onSuccess: (data) => {
-      console.log('Toggled:', data.message);
+      // Invalidate starred items query to refetch
+      queryClient.invalidateQueries({ queryKey: ["starred-items"] });
+      
+      // Also invalidate the folder/file queries if they exist
+      queryClient.invalidateQueries({ queryKey: ["children"] });
+      
+      callbacks?.onSuccess?.(data);
     },
     onError: (error) => {
-      console.error('Error:', error);
-    }
+      callbacks?.onError?.(error);
+    },
   });
+};
 
-  const addStarred = useMutationAddStarred();
-  const removeStarred = useMutationRemoveStarred();
-  const bulkToggle = useMutationBulkToggleStarred();
+/**
+ * Mutation for removing a single item from starred
+ */
+export const useMutationRemoveStarred = (callbacks?: MutationCallbacks) => {
+  const queryClient = useQueryClient();
 
-  const handleToggle = () => {
-    toggleStarred.mutate({ id: '123', type: 'file' });
-  };
+  return useMutation({
+    mutationFn: (payload: StarredPayload) => removeStarredItem(payload),
+    onSuccess: (data) => {
+      // Invalidate starred items query to refetch
+      queryClient.invalidateQueries({ queryKey: ["starred-items"] });
+      
+      // Also invalidate the folder/file queries if they exist
+      queryClient.invalidateQueries({ queryKey: ["children"] });
+      
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error) => {
+      callbacks?.onError?.(error);
+    },
+  });
+};
 
-  const handleBulkToggle = () => {
-    bulkToggle.mutate({
-      items: [
-        { id: '123', type: 'file' },
-        { id: '456', type: 'folder' }
-      ]
-    });
-  };
+/**
+ * Mutation for bulk updating starred status (add or remove multiple items)
+ */
+export const useMutationBulkStarred = (callbacks?: MutationCallbacks) => {
+  const queryClient = useQueryClient();
 
-  return (
-    <div>
-      <button 
-        onClick={handleToggle}
-        disabled={toggleStarred.isPending}
-      >
-        {toggleStarred.isPending ? 'Loading...' : 'Toggle Star'}
-      </button>
-    </div>
-  );
-}
-*/
+  return useMutation({
+    mutationFn: (payload: BulkStarredPayload) => bulkUpdateStarred(payload),
+    onSuccess: (data) => {
+      // Invalidate starred items query to refetch
+      queryClient.invalidateQueries({ queryKey: ["starred-items"] });
+      
+      // Also invalidate the folder/file queries if they exist
+      queryClient.invalidateQueries({ queryKey: ["children"] });
+      
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error) => {
+      callbacks?.onError?.(error);
+    },
+  });
+};

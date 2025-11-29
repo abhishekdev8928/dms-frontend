@@ -321,10 +321,10 @@ useEffect(() => {
                      <ListView
                       selectedIds={selectedIds}
                       onSelectItem={handleItemSelection}
-                      items={sortedItems} // ✅ Pass sortedItems
-                      sortField={sortField} // ✅ Pass sort state
+                      items={sortedItems} 
+                      sortField={sortField} 
                       sortOrder={sortOrder}
-                      onSort={handleSort} // ✅ Pass sort handler
+                      onSort={handleSort} 
                       onItemClick={(item) => itemActions.handleItemClick(item, clearSelection)}
                       onRename={itemActions.handleRename}
                       onDelete={itemActions.handleDelete}

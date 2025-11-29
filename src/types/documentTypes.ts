@@ -15,6 +15,7 @@ export interface FileItem {
   updatedAt: string;
   path: string;
   fileUrl?: string;
+  starred:boolean;
   originalName?: string;
   mimeType?: string;
   size?: number;

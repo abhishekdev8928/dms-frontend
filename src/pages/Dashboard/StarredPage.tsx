@@ -1,269 +1,173 @@
-import React, { useState } from "react";
-import { useAppConfigStore } from "@/config/store/useAppConfigStore";
+import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+import { useFolderMutations } from "@/hooks/mutations/useFolderMutations";
+import { useDocumentMutations } from "@/hooks/mutations/useDocumentMutations";
+import { useQueryStarredItems } from "@/hooks/queries/useStarredQueries";
+
+import FileInfoPanel from "@/components/RightPanelView/ResourcePreviewPanel";
 import GridView from "@/components/explorer/explorerView/GridView";
 import ListView from "@/components/explorer/explorerView/ListView";
-import FilterButtons from "./FilterBox";
+import RenameFolderModal from "@/components/Modals/RenameFolderModal";
+import TagsModal from "@/components/Modals/TagsModal";
+import DeleteModal from "@/components/Modals/DeleteModal";
+import RenameDocumentModal from "@/components/Modals/RenameDocumentModal";
 import { BulkActionToolbar } from "@/components/RightPanelView/Actions/BulkActionToolbar";
-import FileInfoPanel from "@/components/RightPanelView/ResourcePreviewPanel";
-import { useQuery } from "@tanstack/react-query";
-import { getStarredItems } from "@/config/api/starredApi";
-import { 
-  useMutationToggleStarred,
-  useMutationRemoveStarred,
-  useMutationBulkToggleStarred 
-} from "@/hooks/mutations/useStarredMutation";
-import { toast } from "sonner";
-import type { FileItem } from "@/types/documentTypes";
+import { ShareModal } from "@/components/Modals/CreateShareModal.";
 
-const StarredPage = () => {
-  // Zustand store
+import type { FileItem } from "@/types/documentTypes";
+import { useAppConfigStore } from "@/config/store/useAppConfigStore";
+
+// Custom Hooks
+import { useMultiSelect } from "@/hooks/explorer/useMultiSelect";
+import { useItemActions } from "@/hooks/explorer/useItemActions";
+import { useModalState } from "@/hooks/explorer/useModalState";
+import { useBulkActions } from "@/hooks/explorer/useBulkActions";
+import { ViewToggleButtons } from "@/components/explorer/explorerView/ViewToggleButtons";
+import { useSortItems } from "@/hooks/explorer/useSortedItems";
+
+export default function StarredPage() {
+  const queryClient = useQueryClient();
+
+  // Store state - Read from store
   const viewMode = useAppConfigStore((state) => state.viewMode);
+  const setViewMode = useAppConfigStore((state) => state.setViewMode);
   const showInfoPanel = useAppConfigStore((state) => state.showInfoPanel);
   const toggleInfoPanel = useAppConfigStore((state) => state.toggleInfoPanel);
-  const setViewMode = useAppConfigStore((state) => state.setViewMode);
-  const userList = useAppConfigStore((state) => state.userList);
 
-  // Selection state
-  const [selectedIds, setSelectedIds] = useState<{
-    fileIds: string[];
-    folderIds: string[];
-  }>({
-    fileIds: [],
-    folderIds: [],
-  });
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
-
-  // Filter state
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("");
-  const [selectedUser, setSelectedUser] = useState<string>("");
-
-  // Selected item for info panel
-  const [selectedItem, setSelectedItem] = useState<FileItem | null>(null);
+  // UI State
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
   // Fetch starred items
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['starred-items'],
-    queryFn: getStarredItems,
-  });
+  const {
+    data: starredData,
+    isLoading,
+    error,
+  } = useQueryStarredItems();
 
-  // Starred mutations
-  const toggleStarred = useMutationToggleStarred({
-    onSuccess: (data) => {
-      toast.success(data.message || "Starred status updated");
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Failed to update starred status");
-    },
-  });
+  // Transform starred items to match FileItem format
+  const items: FileItem[] = React.useMemo(() => {
+    if (!starredData?.data?.items) return [];
+    
+    return starredData.data.items.map((item) => ({
+      _id: item.id,
+      name: item.name,
+      type: item.type,
+      starred: item.starred,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      parent_id: item.parent_id,
+      createdBy: item.createdBy,
+      // File-specific fields
+      mimeType: item.mimeType,
+      extension: item.extension,
+      size: item.size,
+      // Folder-specific fields
+      color: item.color,
+      path: item.path,
+    }));
+  }, [starredData]);
 
-  const removeStarred = useMutationRemoveStarred({
-    onSuccess: (data) => {
-      toast.success(data.message || "Removed from starred");
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Failed to remove starred");
-    },
-  });
+  const { sortedItems, sortField, sortOrder, handleSort } = useSortItems(items);
 
-  const bulkToggleStarred = useMutationBulkToggleStarred({
-    onSuccess: (data) => {
-      const summary = data?.data?.summary;
-      if (summary) {
-        toast.success(`Updated ${summary.success} of ${summary.total} items`);
-      }
-      // Clear selection after bulk operation
-      setSelectedIds({ fileIds: [], folderIds: [] });
-      setLastSelectedIndex(null);
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Failed to update items");
-    },
-  });
+  // Custom Hooks
+  const { selectedIds, selectItem, clearSelection } = useMultiSelect(sortedItems);
 
-  // Extract items from API response
-  const items: FileItem[] = data?.data?.items || [];
+  const modalState = useModalState();
 
-  // Apply filters
-  const filteredItems = items.filter((item) => {
-    // Type filter
-    if (selectedTypeFilter && selectedTypeFilter !== "") {
-      if (selectedTypeFilter === "folder" && item.type !== "folder") {
-        return false;
-      }
-      if (selectedTypeFilter !== "folder" && item.type === "folder") {
-        return false;
-      }
-      if (
-        selectedTypeFilter !== "folder" &&
-        item.mimeType !== selectedTypeFilter
-      ) {
-        return false;
-      }
-    }
+  const itemActions = useItemActions(
+    modalState.setSelectedItem,
+    modalState.setRenameModalOpen,
+    modalState.setDeleteModalOpen,
+    modalState.setTagsModalOpen,
+    modalState.openShareModal,
+    setSelectedFileId,
+    toggleInfoPanel
+  );
 
-    // User filter
-    if (selectedUser && selectedUser !== "") {
-      if (item.createdBy !== selectedUser) {
-        return false;
-      }
-    }
+  const bulkActions = useBulkActions(undefined, selectedIds, clearSelection);
 
-    return true;
-  });
+  // Mutations
+  const { updateFolderMutation, deleteFolderMutation } = useFolderMutations(undefined, []);
 
-  // Selection handler with shift multiselect
+  const { updateDocumentMutation, deleteDocumentMutation, addTagsMutation } =
+    useDocumentMutations(undefined, selectedFileId, null, () => {});
+
+  // Computed values
+  const isEmpty = sortedItems.length === 0;
+  const isFolder = (item: FileItem | null): boolean =>
+    item !== null && item.type === "folder";
+
+  // Enhanced selection handler
   const handleItemSelection = (
     e: React.MouseEvent<HTMLDivElement | HTMLTableRowElement, MouseEvent>,
     item: { id: string; type: string },
     itemIndex: number
   ): void => {
-    const key = item.type === "folder" ? "folderIds" : "fileIds";
-
-    // Shift + Click: Range selection
-    if (e.shiftKey && lastSelectedIndex !== null) {
-      const start = Math.min(lastSelectedIndex, itemIndex);
-      const end = Math.max(lastSelectedIndex, itemIndex);
-      
-      const rangeItems = filteredItems.slice(start, end + 1);
-      const newFileIds: string[] = [];
-      const newFolderIds: string[] = [];
-
-      rangeItems.forEach((rangeItem) => {
-        if (rangeItem.type === "folder") {
-          newFolderIds.push(rangeItem._id);
-        } else {
-          newFileIds.push(rangeItem._id);
-        }
-      });
-
-      setSelectedIds({
-        fileIds: [...new Set([...selectedIds.fileIds, ...newFileIds])],
-        folderIds: [...new Set([...selectedIds.folderIds, ...newFolderIds])],
-      });
-    }
-    // Ctrl/Cmd + Click: Toggle individual item
-    else if (e.ctrlKey || e.metaKey) {
-      setSelectedIds((prev) => {
-        const exists = prev[key].includes(item.id);
-        return {
-          ...prev,
-          [key]: exists
-            ? prev[key].filter((id) => id !== item.id)
-            : [...prev[key], item.id],
-        };
-      });
-      setLastSelectedIndex(itemIndex);
-    }
-    // Regular click: Select single item
-    else {
-      const newSelectedIds = {
-        fileIds: item.type !== "folder" ? [item.id] : [],
-        folderIds: item.type === "folder" ? [item.id] : [],
-      };
-      setSelectedIds(newSelectedIds);
-      setLastSelectedIndex(itemIndex);
-    }
-  };
-
-  // Item action handlers
-  const handleItemClick = (item: FileItem) => {
-    // TODO: Implement folder navigation or file preview
-    console.log("Item clicked:", item);
-  };
-
-  const handleRename = (item: FileItem) => {
-    // TODO: Open rename modal
-    console.log("Rename:", item);
-  };
-
-  const handleDelete = (item: FileItem) => {
-    // TODO: Open delete modal
-    console.log("Delete:", item);
-  };
-
-  const handleDownload = (item: FileItem) => {
-    // TODO: Implement download
-    console.log("Download:", item);
-  };
-
-  const handleShowInfo = (item: FileItem) => {
-    setSelectedItem(item);
-    if (!showInfoPanel) {
-      toggleInfoPanel();
-    }
-  };
-
-  const handleAddTags = (item: FileItem) => {
-    // TODO: Open tags modal
-    console.log("Add tags:", item);
-  };
-
-  const handleReupload = (documentId: string) => {
-    // TODO: Implement reupload
-    console.log("Reupload:", documentId);
-  };
-
-  // Handle unstar action (remove from starred)
-  const handleUnstarItem = (item: FileItem) => {
-    removeStarred.mutate({
-      id: item._id,
-      type: item.type === "folder" ? "folder" : "file",
+    selectItem(item, itemIndex, {
+      shiftKey: e.shiftKey,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
     });
   };
 
-  // Bulk actions
-  const handleBulkUnstar = () => {
-    const items = [
-      ...selectedIds.fileIds.map(id => ({ id, type: "file" as const })),
-      ...selectedIds.folderIds.map(id => ({ id, type: "folder" as const })),
-    ];
-
-    bulkToggleStarred.mutate({ items });
+  // Delete handler
+  const handleDeleteConfirm = () => {
+    if (modalState.selectedItem) {
+      if (isFolder(modalState.selectedItem)) {
+        deleteFolderMutation.mutate(modalState.selectedItem._id, {
+          onSuccess: () => {
+            toast.success("Item moved to trash", {
+              description: `"${modalState.selectedItem?.name}" has been moved to trash`,
+            });
+            modalState.setDeleteModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ["starred-items"] });
+          },
+          onError: (error: any) => {
+            toast.error("Failed to delete", {
+              description: error?.message || "Please try again",
+            });
+          },
+        });
+      } else {
+        deleteDocumentMutation.mutate(modalState.selectedItem._id, {
+          onSuccess: () => {
+            toast.success("Item moved to trash", {
+              description: `"${modalState.selectedItem?.name}" has been moved to trash`,
+            });
+            modalState.setDeleteModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ["starred-items"] });
+          },
+          onError: (error: any) => {
+            toast.error("Failed to delete", {
+              description: error?.message || "Please try again",
+            });
+          },
+        });
+      }
+    }
   };
 
-  const bulkActionToolBarProps = {
-    onClearSelection: () => {
-      setSelectedIds({
-        fileIds: [],
-        folderIds: [],
-      });
-      setLastSelectedIndex(null);
-    },
-    selectionCount: selectedIds.fileIds.length + selectedIds.folderIds.length,
-    onDeleteSelected: () => {
-      // TODO: Implement bulk delete
-      console.log("Bulk delete:", selectedIds);
-      setSelectedIds({
-        fileIds: [],
-        folderIds: [],
-      });
-      setLastSelectedIndex(null);
-    },
-    onUnstarSelected: handleBulkUnstar,
-  };
-
-  // Update selected item when selection changes
-  React.useEffect(() => {
+  useEffect(() => {
     const totalSelected = selectedIds.fileIds.length + selectedIds.folderIds.length;
 
     if (totalSelected === 1) {
       const selectedId = selectedIds.fileIds[0] || selectedIds.folderIds[0];
-      const item = filteredItems.find((item) => item._id === selectedId);
-      if (item) {
-        setSelectedItem(item);
+      const selectedItem = sortedItems.find((item) => item._id === selectedId);
+
+      if (selectedItem) {
+        modalState.setSelectedItem(selectedItem);
+        setSelectedFileId(selectedId);
       }
     } else {
-      setSelectedItem(null);
+      modalState.setSelectedItem(null);
+      setSelectedFileId(null);
     }
-  }, [selectedIds, filteredItems]);
-
-  const isEmpty = filteredItems.length === 0;
-  const hasFilters = selectedTypeFilter?.trim() !== "" || selectedUser?.trim() !== "";
-
-  const setListView = () => setViewMode("list");
-  const setGridView = () => setViewMode("grid");
+  }, [selectedIds, sortedItems]);
 
   return (
     <div className="h-full flex flex-col py-4 pe-4">
@@ -273,123 +177,30 @@ const StarredPage = () => {
           {/* Header - Fixed */}
           <div className="flex-shrink-0 p-6 pt-3">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold">Starred</h2>
-
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-0">
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="icon"
-                    onClick={setListView}
-                    className={
-                      viewMode === "list"
-                        ? "bg-[#035C4C] hover:bg-[#035C4C] rounded-e-[0px] border border-[#035C4C] py-5 px-5 border-2"
-                        : "border-2 rounded-e-[0px] border-[#434343] py-5 px-5"
-                    }
-                  >
-                    <svg
-                      width="20"
-                      height="16"
-                      viewBox="0 0 20 16"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M1 1H1.01M1 8H1.01M1 15H1.01M6 1H19M6 8H19M6 15H19"
-                        stroke={viewMode === "list" ? "white" : "black"}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </Button>
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="icon"
-                    onClick={setGridView}
-                    className={
-                      viewMode === "grid"
-                        ? "bg-[#035C4C] hover:bg-[#035C4C] rounded-s-[0px] border-[#035C4C] py-5 px-5 border-2"
-                        : "border-2 py-5 px-5 rounded-s-[0px] border-[#434343]"
-                    }
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M7 1H2C1.44772 1 1 1.44772 1 2V7C1 7.55228 1.44772 8 2 8H7C7.55228 8 8 7.55228 8 7V2C8 1.44772 7.55228 1 7 1Z"
-                        stroke={viewMode === "list" ? "black" : "white"}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M18 1H13C12.4477 1 12 1.44772 12 2V7C12 7.55228 12.4477 8 13 8H18C18.5523 8 19 7.55228 19 7V2C19 1.44772 18.5523 1 18 1Z"
-                        stroke={viewMode === "list" ? "black" : "white"}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M18 12H13C12.4477 12 12 12.4477 12 13V18C12 18.5523 12.4477 19 13 19H18C18.5523 19 19 18.5523 19 18V13C19 12.4477 18.5523 12 18 12Z"
-                        stroke={viewMode === "list" ? "black" : "white"}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M7 12H2C1.44772 12 1 12.4477 1 13V18C1 18.5523 1.44772 19 2 19H7C7.55228 19 8 18.5523 8 18V13C8 12.4477 7.55228 12 7 12Z"
-                        stroke={viewMode === "list" ? "black" : "white"}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </Button>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleInfoPanel}
-                  className={showInfoPanel ? "bg-gray-100" : ""}
-                >
-                  <svg
-                    width="22"
-                    height="22"
-                    viewBox="0 0 22 22"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M11 15V11M11 7H11.01M21 11C21 16.5228 16.5228 21 11 21C5.47715 21 1 16.5228 1 11C1 5.47715 5.47715 1 11 1C16.5228 1 21 5.47715 21 11Z"
-                      stroke="#434343"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </Button>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold text-gray-900">Starred</h1>
+                <span className="text-sm text-gray-500">
+                  {starredData?.data?.total || 0} items
+                </span>
               </div>
+
+              <ViewToggleButtons
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                showInfoPanel={showInfoPanel}
+                onToggleInfoPanel={toggleInfoPanel}
+              />
             </div>
 
             {/* Filter Buttons */}
             <div className="right-panel-filter">
-              {selectedIds.fileIds.length > 0 ||
-              selectedIds.folderIds.length > 0 ? (
-                <BulkActionToolbar {...bulkActionToolBarProps} />
-              ) : (
-                <FilterButtons
-                  selectedTypeFilter={selectedTypeFilter}
-                  setSelectedTypeFilter={setSelectedTypeFilter}
-                  selectedUser={selectedUser}
-                  setSelectedUser={setSelectedUser}
-                  userData={userList}
+              {selectedIds.fileIds.length > 0 || selectedIds.folderIds.length > 0 ? (
+                <BulkActionToolbar
+                  onClearSelection={clearSelection}
+                  selectionCount={bulkActions.selectedCount}
+                  onDeleteSelected={bulkActions.bulkDelete}
                 />
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -402,36 +213,28 @@ const StarredPage = () => {
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <p className="text-red-600 mb-4">Failed to load starred items</p>
-                <Button onClick={() => refetch()}>Retry</Button>
+                <Button
+                  onClick={() =>
+                    queryClient.invalidateQueries({
+                      queryKey: ["starred-items"],
+                    })
+                  }
+                >
+                  Retry
+                </Button>
               </div>
             ) : isEmpty ? (
-              hasFilters ? (
-                <div className="flex flex-col items-center justify-center h-full text-center text-gray-600">
-                  <img
-                    src="https://ssl.gstatic.com/docs/doclist/images/empty_state_recents_v4.svg"
-                    alt="No matching results"
-                    className="w-64 mb-6 opacity-80"
-                  />
-                  <h2 className="text-xl font-semibold">No matching results</h2>
-                  <p className="text-gray-500 mt-2">
-                    Adjust your filters or try searching again.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-gray-600">
-                  <img
-                    src="https://ssl.gstatic.com/docs/doclist/images/empty_state_starred.svg"
-                    alt="No starred items"
-                    className="w-64 mb-6 opacity-80"
-                  />
-                  <h2 className="text-xl font-semibold">
-                    No starred files or folders
-                  </h2>
-                  <p className="text-gray-500 mt-2">
-                    Add stars to things that you want to easily find later
-                  </p>
-                </div>
-              )
+              <div className="flex flex-col items-center justify-center h-full text-center text-gray-600">
+                <img
+                  src="https://ssl.gstatic.com/docs/doclist/images/empty_state_starred_files_v3.svg"
+                  alt="No starred items"
+                  className="w-64 mb-6 opacity-80"
+                />
+                <h2 className="text-xl font-semibold">No starred items yet</h2>
+                <p className="text-gray-500 mt-2">
+                  Star items to easily find them later.
+                </p>
+              </div>
             ) : (
               <ScrollArea className="h-full">
                 <div className="p-6">
@@ -439,29 +242,29 @@ const StarredPage = () => {
                     <ListView
                       selectedIds={selectedIds}
                       onSelectItem={handleItemSelection}
-                      items={filteredItems}
-                      onItemClick={handleItemClick}
-                      onRename={handleRename}
-                      onDelete={handleDelete}
-                      onDownload={handleDownload}
-                      onShowInfo={handleShowInfo}
-                      onAddTags={handleAddTags}
-                      onReupload={handleReupload}
-                      onUnstar={handleUnstarItem}
+                      items={sortedItems}
+                      sortField={sortField}
+                      sortOrder={sortOrder}
+                      onSort={handleSort}
+                      onItemClick={(item) => itemActions.handleItemClick(item, clearSelection)}
+                      onRename={itemActions.handleRename}
+                      onDelete={itemActions.handleDelete}
+                      onDownload={itemActions.handleDownload}
+                      onShowInfo={itemActions.handleShowInfo}
+                      onAddTags={itemActions.handleAddTags}
+                      onShare={itemActions.handleShare}
                     />
                   ) : (
                     <GridView
-                      items={filteredItems}
+                      items={sortedItems}
                       selectedIds={selectedIds}
                       onSelectItem={handleItemSelection}
-                      onItemClick={handleItemClick}
-                      onRename={handleRename}
-                      onDelete={handleDelete}
-                      onDownload={handleDownload}
-                      onShowInfo={handleShowInfo}
-                      onAddTags={handleAddTags}
-                      onReupload={handleReupload}
-                      onUnstar={handleUnstarItem}
+                      onItemClick={(item) => itemActions.handleItemClick(item, clearSelection)}
+                      onRename={itemActions.handleRename}
+                      onDelete={itemActions.handleDelete}
+                      onDownload={itemActions.handleDownload}
+                      onShowInfo={itemActions.handleShowInfo}
+                      onAddTags={itemActions.handleAddTags}
                     />
                   )}
                 </div>
@@ -474,17 +277,93 @@ const StarredPage = () => {
         {showInfoPanel && (
           <div className="w-[350px] flex-shrink-0 h-full overflow-hidden">
             <FileInfoPanel
-              item={selectedItem}
-              selectionCount={
-                selectedIds.fileIds.length + selectedIds.folderIds.length
-              }
+              item={modalState.selectedItem}
+              selectionCount={bulkActions.selectedCount}
               onClose={toggleInfoPanel}
             />
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <RenameDocumentModal
+        open={modalState.renameModalOpen && !isFolder(modalState.selectedItem)}
+        onOpenChange={modalState.setRenameModalOpen}
+        item={modalState.selectedItem}
+        onConfirm={async (data) => {
+          if (modalState.selectedItem) {
+            try {
+              await updateDocumentMutation.mutateAsync({
+                id: modalState.selectedItem._id,
+                name: data.name,
+                description: data.description,
+              });
+              modalState.setRenameModalOpen(false);
+              queryClient.invalidateQueries({ queryKey: ["starred-items"] });
+            } catch (error) {
+              console.error("Failed to rename document:", error);
+            }
+          }
+        }}
+        isLoading={updateDocumentMutation.isPending}
+      />
+
+      <RenameFolderModal
+        open={modalState.renameModalOpen && isFolder(modalState.selectedItem)}
+        onOpenChange={modalState.setRenameModalOpen}
+        item={modalState.selectedItem}
+        onConfirm={async (data) => {
+          if (modalState.selectedItem) {
+            try {
+              await updateFolderMutation.mutateAsync({
+                id: modalState.selectedItem._id,
+                name: data.name,
+                color: data.color,
+              });
+              modalState.setRenameModalOpen(false);
+              queryClient.invalidateQueries({ queryKey: ["starred-items"] });
+            } catch (error) {
+              console.error("Failed to rename folder:", error);
+            }
+          }
+        }}
+        isLoading={updateFolderMutation.isPending}
+      />
+
+      <DeleteModal
+        open={modalState.deleteModalOpen}
+        onOpenChange={modalState.setDeleteModalOpen}
+        item={modalState.selectedItem}
+        onConfirm={handleDeleteConfirm}
+        isLoading={deleteFolderMutation.isPending || deleteDocumentMutation.isPending}
+      />
+
+      <TagsModal
+        open={modalState.tagsModalOpen}
+        onOpenChange={modalState.setTagsModalOpen}
+        item={modalState.selectedItem}
+        onConfirm={async (tags) => {
+          if (modalState.selectedItem) {
+            try {
+              await addTagsMutation.mutateAsync({
+                id: modalState.selectedItem._id,
+                tags,
+              });
+              modalState.setTagsModalOpen(false);
+              queryClient.invalidateQueries({ queryKey: ["starred-items"] });
+            } catch (error) {
+              console.error("Failed to add tags:", error);
+            }
+          }
+        }}
+        isLoading={addTagsMutation.isPending}
+      />
+
+      <ShareModal
+        isOpen={modalState.shareModalOpen}
+        item={modalState.selectedItem}
+        onOpenChange={modalState.openShareModal}
+      />
     </div>
   );
-};
-
-export default StarredPage;
+}
