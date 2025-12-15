@@ -108,6 +108,12 @@ export default function ListView({
     }
   };
 
+  // Check permission helper
+  const canDo = (item: FileItem, action: string) => {
+    if (!item.allowedActions) return true;
+    return item.allowedActions[action] !== false;
+  };
+
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString("en-US", {
       day: "numeric",
@@ -310,130 +316,153 @@ export default function ListView({
                           </DropdownMenuTrigger>
 
                           <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuSub>
-                              <DropdownMenuSubTrigger>
-                                <FolderInput className="w-4 h-4 mr-2" /> Organize
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onMove?.(item);
-                                  }}
-                                >
-                                  <FolderInput className="w-4 h-4 mr-2" /> Move
-                                </DropdownMenuItem>
-                                
-                                {/* Dynamic Starred Menu Item */}
-                                <DropdownMenuItem
-                                  onClick={(e) => handleToggleStarred(item, e)}
-                                  disabled={addStarred.isPending || removeStarred.isPending}
-                                >
-                                  {item.starred ? (
-                                    <>
-                                      <StarOff className="w-4 h-4 mr-2" /> Remove from Starred
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Star className="w-4 h-4 mr-2" /> Add to Starred
-                                    </>
+                            {(canDo(item, 'canMove') || canDo(item, 'canEdit')) && (
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                  <FolderInput className="w-4 h-4 mr-2" /> Organize
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                  {canDo(item, 'canMove') && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onMove?.(item);
+                                      }}
+                                    >
+                                      <FolderInput className="w-4 h-4 mr-2" /> Move
+                                    </DropdownMenuItem>
                                   )}
-                                </DropdownMenuItem>
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
+                                  
+                                  <DropdownMenuItem
+                                    onClick={(e) => handleToggleStarred(item, e)}
+                                    disabled={addStarred.isPending || removeStarred.isPending}
+                                  >
+                                    {item.starred ? (
+                                      <>
+                                        <StarOff className="w-4 h-4 mr-2" /> Remove from Starred
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Star className="w-4 h-4 mr-2" /> Add to Starred
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                            )}
 
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRename(item);
-                              }}
-                            >
-                              <Pencil className="w-4 h-4 mr-2" /> Rename
-                            </DropdownMenuItem>
+                            {canDo(item, 'canEdit') && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRename(item);
+                                }}
+                              >
+                                <Pencil className="w-4 h-4 mr-2" /> Rename
+                              </DropdownMenuItem>
+                            )}
 
                             {!isFolder(item) && (
                               <>
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDownload(item);
-                                  }}
-                                >
-                                  <Download className="w-4 h-4 mr-2" /> Download
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onShowInfo(item);
-                                  }}
-                                >
-                                  <Eye className="w-4 h-4 mr-2" /> View Details
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAddTags(item);
-                                  }}
-                                >
-                                  <Tag className="w-4 h-4 mr-2" /> Add Tags
-                                </DropdownMenuItem>
-
-                                <DropdownMenuSeparator />
-
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onShare(item);
-                                  }}
-                                >
-                                  <Users className="w-4 h-4 mr-2" /> Share 
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onReupload(item._id);
-                                  }}
-                                >
-                                  <RefreshCw className="w-4 h-4 mr-2" /> Reupload
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Link
-                                    to={`/dashboard/version-history/${item._id}`}
-                                    className="flex items-center w-full"
+                                {canDo(item, 'canDownload') && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDownload(item);
+                                    }}
                                   >
-                                    <History className="w-4 h-4 mr-2" /> Version History
-                                  </Link>
-                                </DropdownMenuItem>
+                                    <Download className="w-4 h-4 mr-2" /> Download
+                                  </DropdownMenuItem>
+                                )}
 
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onShowInfo(item , "activity");
-                                    
-                                  }}
-                                >
-                                  <Activity className="w-4 h-4 mr-2" /> Activity
-                                </DropdownMenuItem>
+                                {canDo(item, 'canView') && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onShowInfo(item);
+                                    }}
+                                  >
+                                    <Eye className="w-4 h-4 mr-2" /> View Details
+                                  </DropdownMenuItem>
+                                )}
+
+                                {canDo(item, 'canEdit') && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onAddTags(item);
+                                    }}
+                                  >
+                                    <Tag className="w-4 h-4 mr-2" /> Add Tags
+                                  </DropdownMenuItem>
+                                )}
+
+                                {(canDo(item, 'canShare') || canDo(item, 'canEdit') || canDo(item, 'canView')) && (
+                                  <DropdownMenuSeparator />
+                                )}
+
+                                {canDo(item, 'canShare') && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onShare(item);
+                                    }}
+                                  >
+                                    <Users className="w-4 h-4 mr-2" /> Share 
+                                  </DropdownMenuItem>
+                                )}
+
+                                {(canDo(item, 'canEdit') || canDo(item, 'canUpload')) && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onReupload(item._id);
+                                    }}
+                                  >
+                                    <RefreshCw className="w-4 h-4 mr-2" /> Reupload
+                                  </DropdownMenuItem>
+                                )}
+
+                                {canDo(item, 'canView') && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Link
+                                      to={`/dashboard/version-history/${item._id}`}
+                                      className="flex items-center w-full"
+                                    >
+                                      <History className="w-4 h-4 mr-2" /> Version History
+                                    </Link>
+                                  </DropdownMenuItem>
+                                )}
+
+                                {canDo(item, 'canView') && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onShowInfo(item , "activity");
+                                    }}
+                                  >
+                                    <Activity className="w-4 h-4 mr-2" /> Activity
+                                  </DropdownMenuItem>
+                                )}
                               </>
                             )}
 
-                            <DropdownMenuSeparator />
-
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDelete(item);
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" /> Move to Trash
-                            </DropdownMenuItem>
+                            {canDo(item, 'canDelete') && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDelete(item);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" /> Move to Trash
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>

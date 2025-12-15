@@ -1,4 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ROLES } from "@/config/permissions";
 
 import DepartmentPage from "../pages/Dashboard/DepartmentPage";
 import FileVersionHistory from "@/pages/Dashboard/FileVersionHistroy";
@@ -11,27 +13,29 @@ import DashboardLayout from "../components/layout/DasboardLayout";
 import HomePage from "@/pages/Dashboard/HomePage";
 import RightPanelView from "@/pages/Dashboard/ExplorerViewPage";
 import NotFoundPage from "@/pages/Common/NotFoundPage";
-import  ForgetPasswordPage  from "@/pages/Auth/ForgotPasswordPage";
+import ForgetPasswordPage from "@/pages/Auth/ForgotPasswordPage";
 import StarredPage from "@/pages/Dashboard/StarredPage";
+import UnauthorizedPage from "@/components/common/UnauthorizedPage";
 
 export const router = createBrowserRouter([
-  // ================================
-  // Root path redirect (no render)
-  // ================================
   {
     path: "/",
     element: <Navigate to="/dashboard/department" replace />,
   },
 
-  // ================================
-  // Dashboard (Protected Area)
-  // ================================
+  // ============================================
+  // PROTECTED DASHBOARD ROUTES
+  // ============================================
   {
     path: "/dashboard",
-    element: <DashboardLayout />,
+    element: (
+     
+        <DashboardLayout />
+      
+    ),
     children: [
       {
-        index: true, // when visiting /dashboard directly
+        index: true,
         element: <Navigate to="/dashboard/home" replace />,
       },
       {
@@ -44,7 +48,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "department",
-        element: <DepartmentPage />,
+        element: (
+          
+            <DepartmentPage />
+          
+        ),
       },
       {
         path: "version-history/:documentId",
@@ -52,18 +60,22 @@ export const router = createBrowserRouter([
       },
       {
         path: "restore",
-        element: <TrashScreen />,
+        element: (
+          
+            <TrashScreen />
+          
+        ),
       },
-       {
+      {
         path: "starred",
         element: <StarredPage />,
       },
     ],
   },
 
-  // ================================
-  // Authentication (Public Area)
-  // ================================
+  // ============================================
+  // PUBLIC AUTH ROUTES
+  // ============================================
   {
     path: "/auth",
     element: <AuthLayout />,
@@ -78,11 +90,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "forgot-password",
-        element: <ForgetPasswordPage/>,
+        element: <ForgetPasswordPage />,
       },
       {
         path: "reset-password",
-        element: <Resetpassword/>,
+        element: <Resetpassword />,
       },
       {
         index: true,
@@ -91,9 +103,13 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // ================================
-  // Not Found (Fallback)
-  // ================================
+  // ============================================
+  // ERROR PAGES
+  // ============================================
+  {
+    path: "/unauthorized",
+    element: <UnauthorizedPage />,
+  },
   {
     path: "*",
     element: <NotFoundPage />,

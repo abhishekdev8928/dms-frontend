@@ -83,6 +83,7 @@ export const generatePresignedUrlsSchema = z.object({
     )
     .min(1, "At least one file is required")
     .max(100, "Maximum 100 files allowed per request"),
+    parent_id: z.string(),
 });
 
 // Create document

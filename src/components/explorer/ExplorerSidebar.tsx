@@ -61,18 +61,14 @@ import { DropdownMenuSeparator } from "@radix-ui/react-dropdown-menu";
 
 import { CreateUserModal } from "@/components/Modals/CreateUserModal";
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+
 interface TreeNode {
   id: string;
   name: string;
   children: TreeNode[];
 }
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
+
 export const ExplorerSidebar = () => {
   const { parentId } = useParams<{ parentId: string }>();
   const navigate = useNavigate();
@@ -110,9 +106,7 @@ export const ExplorerSidebar = () => {
 
   const treeData: TreeNode[] = treeResponse?.data || [];
 
-  // ============================================================================
-  // MUTATIONS
-  // ============================================================================
+  
   const createDeptMutation = useMutation({
     mutationFn: createDepartment,
     onSuccess: (data) => {
@@ -547,7 +541,7 @@ export const ExplorerSidebar = () => {
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="start" className="w-[240px] p-[10px]">
-                {/* <DropdownMenuItem
+                <DropdownMenuItem
                   className="py-2 cursor-pointer hover:bg-[#F6FFFD] mb-1"
                   onClick={() => setIsUserModalOpen(true)}
                 >
@@ -576,7 +570,7 @@ export const ExplorerSidebar = () => {
                   <div className="flex-1">
                     <div className="text-[16px] roboto">Add Users</div>
                   </div>
-                </DropdownMenuItem> */}
+                </DropdownMenuItem> 
 
                 <DropdownMenuItem
                   className={`py-2 cursor-pointer ${

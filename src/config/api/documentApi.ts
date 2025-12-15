@@ -27,10 +27,13 @@ import {
  * Route: POST /api/documents/generate-upload-urls
  * Access: Private
  */
-export const generatePresignedUrls = async (
-  files: { filename: string; mimeType: string }[]
-) => {
-  const validated = generatePresignedUrlsSchema.parse({ files });
+export const generatePresignedUrls = async (payload: {
+  files: { filename: string; mimeType: string }[];
+  parent_id: string;
+}) => {
+  // Validate the payload structure
+  const validated = generatePresignedUrlsSchema.parse(payload);
+  
   const res = await httpClient.post("/documents/generate-upload-urls", validated);
   return res.data;
 };

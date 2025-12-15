@@ -79,7 +79,12 @@ export const uploadFiles = async (
       mimeType: file.type,
     }));
 
-    const presignedResponse = await generatePresignedUrls(filesPayload);
+    // ✅ FIXED: Pass parent_id to generatePresignedUrls
+    const presignedResponse = await generatePresignedUrls({
+      files: filesPayload,
+      parent_id: parentId, // ✅ Now included!
+    });
+    
     const presignedFiles = presignedResponse?.data;
 
     if (!Array.isArray(presignedFiles)) {
@@ -173,7 +178,6 @@ export const uploadFiles = async (
     // ✅ Step 3: Log activity AFTER all files successfully uploaded
     if (uploadedFiles.length > 0) {
       try {
-        // ✅ NEW FORMAT: Send only parentId and files array
         await logBulkFileUpload({
           parentId: parentId, // Backend will fetch parent folder snapshot
           files: uploadedFiles.map(file => ({
