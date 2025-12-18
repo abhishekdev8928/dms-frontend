@@ -63,7 +63,7 @@ export default function GridView({
   };
 
   const getImageUrl = (item: FileItem): string => {
-    return `https://d1rf5tmmedb5ah.cloudfront.net/${item.fileUrl}`;
+    return `https://d25i0k88dtrzqd.cloudfront.net/${item.fileUrl}`;
   };
 
   const isFolder = (item: FileItem): boolean => 

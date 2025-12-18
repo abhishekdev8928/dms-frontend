@@ -5,7 +5,7 @@ import { useAuthStore } from '@/config/store/authStore'; // Adjust path as neede
 
 // added production
 const httpClient = axios.create({
-  baseURL: "http://localhost:3200/api", 
+  baseURL: "https://digihostinfra.com/api", 
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

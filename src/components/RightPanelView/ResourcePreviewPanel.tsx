@@ -17,7 +17,7 @@ interface FileInfoPanelProps {
   onClose: () => void;
 }
 
-const CLOUDFRONT_BASE_URL = 'https://d1rf5tmmedb5ah.cloudfront.net';
+const CLOUDFRONT_BASE_URL = 'https://d25i0k88dtrzqd.cloudfront.net';
 
 export default function   ResourcePreviewPanel({ item, selectionCount, onClose }: FileInfoPanelProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details');

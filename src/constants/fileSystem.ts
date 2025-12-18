@@ -37,7 +37,7 @@ export const isImageFile = (filename: string) => {
 };
 
 export const getImageUrl = (fileUrl: string) => {
-  return `https://d1rf5tmmedb5ah.cloudfront.net/${fileUrl}`;
+  return `https://d25i0k88dtrzqd.cloudfront.net/${fileUrl}`;
 };
 
 export const isFolder = (item: { type: string; itemType?: string }) => {
