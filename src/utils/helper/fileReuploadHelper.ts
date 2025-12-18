@@ -15,11 +15,9 @@ export interface FileReuploadResult {
   versionId?: string;
 }
 
-
 const generateUniqueId = () => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
-
 
 export const reuploadFile = async (
   file: File,
@@ -35,33 +33,41 @@ export const reuploadFile = async (
     throw new Error("Document ID is required");
   }
 
-  const { addUpload, updateProgress, setStatus, removeUpload } = useUploadStore.getState();
+  const { addUpload, updateProgress, setStatus, removeUpload } =
+    useUploadStore.getState();
 
   const uploadId = generateUniqueId();
   const abortController = new AbortController();
 
   try {
     // Step 1: Generate presigned URL for the single file
-    const filesPayload = [{
-      filename: file.name,
-      mimeType: file.type,
-    }];
+    const filesPayload = [
+      {
+        filename: file.name,
+        mimeType: file.type,
+      },
+    ];
 
-    const presignedResponse = await generatePresignedUrls(filesPayload);
-    
+    const presignedResponse = await generatePresignedUrls({
+      parent_id: documentId,
+      files: [
+        {
+          filename: file.name,
+          mimeType: file.type,
+        },
+      ],
+    });
+
     // Handle different possible response structures
     let presignedFiles;
-    
+
     if (Array.isArray(presignedResponse?.data)) {
       presignedFiles = presignedResponse.data;
-    } 
-    else if (Array.isArray(presignedResponse?.data?.urls)) {
+    } else if (Array.isArray(presignedResponse?.data?.urls)) {
       presignedFiles = presignedResponse.data.urls;
-    }
-    else if (Array.isArray(presignedResponse?.data?.data)) {
+    } else if (Array.isArray(presignedResponse?.data?.data)) {
       presignedFiles = presignedResponse.data.data;
-    }
-    else {
+    } else {
       throw new Error("Invalid presigned URL response structure");
     }
 
@@ -72,8 +78,10 @@ export const reuploadFile = async (
     const presignedData = presignedFiles[0];
 
     // Try different possible field names for upload URL
-    const uploadUrl = presignedData.uploadUrl || presignedData.url || presignedData.signedUrl;
-    const s3Key = presignedData.fileUrl || presignedData.key || presignedData.s3Key;
+    const uploadUrl =
+      presignedData.uploadUrl || presignedData.url || presignedData.signedUrl;
+    const s3Key =
+      presignedData.fileUrl || presignedData.key || presignedData.s3Key;
 
     if (!uploadUrl) {
       throw new Error("Upload URL not found in presigned response");
@@ -89,7 +97,7 @@ export const reuploadFile = async (
       name: file.name,
       progress: 0,
       size: file.size,
-      status: 'Uploading File',
+      status: "Uploading File",
       cancelToken: abortController,
     });
 
@@ -108,10 +116,10 @@ export const reuploadFile = async (
     });
 
     // Update status to Processing
-    setStatus(uploadId, 'Processing File');
+    setStatus(uploadId, "Processing File");
 
     // Extract file extension
-    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    const extension = file.name.split(".").pop()?.toLowerCase() || "";
 
     // Step 3: Create version record with all required fields
     const versionResponse = await createVersion(documentId, {
@@ -119,13 +127,13 @@ export const reuploadFile = async (
       size: file.size,
       mimeType: file.type,
       extension: extension,
-      name: file.name.replace(`.${extension}`, ''), // Name without extension
+      name: file.name.replace(`.${extension}`, ""), // Name without extension
       originalName: file.name,
       changeDescription: changeDescription || "File reuploaded",
     });
 
     // Mark as completed
-    setStatus(uploadId, 'Upload Complete');
+    setStatus(uploadId, "Upload Complete");
 
     // Auto-remove after 3 seconds
     setTimeout(() => {
@@ -139,10 +147,10 @@ export const reuploadFile = async (
       versionId: versionResponse?.data?._id,
     };
   } catch (error: any) {
-    if (axios.isCancel(error) || error.name === 'CanceledError') {
-      setStatus(uploadId, 'Upload Cancelled');
+    if (axios.isCancel(error) || error.name === "CanceledError") {
+      setStatus(uploadId, "Upload Cancelled");
     } else {
-      setStatus(uploadId, 'Upload Failed', error.message);
+      setStatus(uploadId, "Upload Failed", error.message);
     }
 
     onError?.(error);
@@ -197,7 +205,9 @@ export const validateFile = (
   if (file.size > MAX_FILE_SIZE) {
     return {
       valid: false,
-      error: `File too large. Max size: ${MAX_FILE_SIZE / 1024 / 1024 / 1024}GB`,
+      error: `File too large. Max size: ${
+        MAX_FILE_SIZE / 1024 / 1024 / 1024
+      }GB`,
     };
   }
 
