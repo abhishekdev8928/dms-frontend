@@ -1,152 +1,77 @@
 import httpClient from "../httpClient";
+import type {
+  IGetAllDepartmentsResponse,
+  IGetDepartmentByIdResponse,
+  ICreateDepartmentResponse,
+  IUpdateDepartmentResponse,
+  IDeleteDepartmentResponse,
+  IGetAllDepartmentsParams,
+  ICreateDepartmentData,
+  IUpdateDepartmentData
+} from "../types/departmentTypes";
 
-/* =======================================================
-   DEPARTMENT MANAGEMENT API CALLS
-   ======================================================= */
+/**
+ * Department API Helper
+ * Matches backend routes exactly
+ */
 
-/** Get all departments with pagination and filtering */
-export const getAllDepartments = async (params?: {
-  page?: number;
-  limit?: number;
-  search?: string;
-  sortBy?: string;
-  order?: "asc" | "desc";
-  activeOnly?: boolean;
-}) => {
-  const res = await httpClient.get("/departments", { params });
-  return res.data;
-};
-
-/** Create a new department */
-export const createDepartment = async (data: {
-  name: string;
-  description?: string;
-}) => {
+/**
+ * POST /api/departments
+ * Create a new ORG department
+ * Access: SUPER_ADMIN, ADMIN only
+ */
+export const createDepartment = async (
+  data: ICreateDepartmentData
+): Promise<ICreateDepartmentResponse> => {
   const res = await httpClient.post("/departments", data);
   return res.data;
 };
 
-/** Get department by ID */
-export const getDepartmentById = async (id: string) => {
+/**
+ * GET /api/departments
+ * Get all departments (filtered by user's access)
+ * Access: All authenticated users
+ */
+export const getAllDepartments = async (
+  params?: IGetAllDepartmentsParams
+): Promise<IGetAllDepartmentsResponse> => {
+  const res = await httpClient.get("/departments", { params });
+  return res.data;
+};
+
+/**
+ * GET /api/departments/:id
+ * Get single department by ID
+ * Access: All authenticated users (with access verification)
+ */
+export const getDepartmentById = async (
+  id: string
+): Promise<IGetDepartmentByIdResponse> => {
   const res = await httpClient.get(`/departments/${id}`);
   return res.data;
 };
 
-/** Update department */
+/**
+ * PATCH /api/departments/:id
+ * Update department details (ORG departments only)
+ * Access: SUPER_ADMIN, ADMIN, DEPARTMENT_OWNER
+ */
 export const updateDepartment = async (
   id: string,
-  data: {
-    name?: string;
-    description?: string;
-    isActive?: boolean;
-  }
-) => {
+  data: IUpdateDepartmentData
+): Promise<IUpdateDepartmentResponse> => {
   const res = await httpClient.patch(`/departments/${id}`, data);
   return res.data;
 };
 
-/** Delete department permanently */
-export const deleteDepartment = async (id: string) => {
+/**
+ * DELETE /api/departments/:id
+ * Delete department permanently (ORG departments only)
+ * Access: SUPER_ADMIN only
+ */
+export const deleteDepartment = async (
+  id: string
+): Promise<IDeleteDepartmentResponse> => {
   const res = await httpClient.delete(`/departments/${id}`);
   return res.data;
 };
-
-/** Deactivate department */
-export const deactivateDepartment = async (id: string) => {
-  const res = await httpClient.patch(`/departments/${id}/deactivate`);
-  return res.data;
-};
-
-/** Activate department */
-export const activateDepartment = async (id: string) => {
-  const res = await httpClient.patch(`/departments/${id}/activate`);
-  return res.data;
-};
-
-/** Update department statistics */
-export const updateDepartmentStats = async (id: string) => {
-  const res = await httpClient.patch(`/departments/${id}/stats`);
-  return res.data;
-};
-
-/** Get department by name */
-export const getDepartmentByName = async (name: string) => {
-  const res = await httpClient.get(`/departments/name/${name}`);
-  return res.data;
-};
-
-/** Get department hierarchy (all items within department) */
-export const getDepartmentHierarchy = async (
-  id: string,
-  depth?: number
-) => {
-  const res = await httpClient.get(`/departments/${id}/hierarchy`, {
-    params: { depth },
-  });
-  return res.data;
-};
-
-/* =======================================================
-   TYPE DEFINITIONS
-   ======================================================= */
-
-export interface Department {
-  _id: string;
-  name: string;
-  description?: string;
-  slug: string;
-  path: string;
-  isActive: boolean;
-  folderCount: number;
-  documentCount: number;
-  totalSize: number;
-  totalSizeFormatted: string;
-  createdBy: string | User;
-  updatedBy?: string | User;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface User {
-  _id: string;
-  username: string;
-  email: string;
-  name: string;
-}
-
-export interface DepartmentHierarchy {
-  department: Department;
-  children: Item[];
-}
-
-export interface Item {
-  _id: string;
-  name: string;
-  type: "folder" | "document";
-  path: string;
-  isDeleted: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface DepartmentListResponse {
-  success: boolean;
-  count: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  data: Department[];
-}
-
-export interface DepartmentResponse {
-  success: boolean;
-  message?: string;
-  data: Department;
-}
-
-export interface DepartmentStats {
-  folderCount: number;
-  documentCount: number;
-  totalSize: number;
-  totalSizeFormatted: string;
-}

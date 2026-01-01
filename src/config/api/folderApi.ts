@@ -1,15 +1,30 @@
 import httpClient from "../httpClient";
 import {
   createFolderSchema,
-  getRootFoldersSchema,
   folderIdSchema,
   getChildFoldersSchema,
-  getAllDescendantsSchema,
   updateFolderSchema,
   moveFolderSchema,
   searchFoldersSchema,
-  getFolderByPathSchema,
+  shareFolderSchema,
 } from "@/utils/validations/folderValidation";
+import type {
+  ICreateFolderData,
+  IUpdateFolderData,
+  IMoveFolderData,
+  IGetChildFoldersParams,
+  ISearchFoldersParams,
+  IShareFolderData,
+  IFolderResponse,
+  IFolderChildrenResponse,
+  IFolderStatsResponse,
+  IFolderBreadcrumbsResponse,
+  IFolderSearchResponse,
+  IDeleteFolderResponse,
+  IRestoreFolderResponse,
+  IMoveFolderResponse,
+  IShareFolderResponse,
+} from "@/config/types/folderTypes";
 
 /* =======================================================
    FOLDER MANAGEMENT API CALLS
@@ -18,86 +33,47 @@ import {
 /**
  * Create a new folder
  * Route: POST /api/folders
- * Access: Private
+ * Access: Private - Requires 'upload' permission on parent
  */
-export const createFolder = async (data: {
-  name: string;
-  parent_id: string;
-  description?: string;
-  color?: string;
-}) => {
-  const validated = createFolderSchema.parse(data);
+export const createFolder = async (
+  payload: ICreateFolderData
+): Promise<IFolderResponse> => {
+  const validated = createFolderSchema.parse(payload);
   const res = await httpClient.post("/folders", validated);
   return res.data;
 };
 
 /**
- * Get root folders of a department
- * Route: GET /api/departments/:departmentId/folders
- * Access: Private
- */
-export const getRootFolders = async (
-  departmentId: string,
-  includeDeleted = false
-) => {
-  const validated = getRootFoldersSchema.parse({ departmentId, includeDeleted });
-  const res = await httpClient.get(`/departments/${validated.departmentId}/folders`, {
-    params: { includeDeleted: validated.includeDeleted },
-  });
-  return res.data;
-};
-
-/**
- * Get folder by ID with details and breadcrumbs
+ * Get folder by ID with details
  * Route: GET /api/folders/:id
- * Access: Private
+ * Access: Private - Requires 'view' permission
  */
-export const getFolderById = async (id: string) => {
+export const getFolderById = async (id: string): Promise<IFolderResponse> => {
   const validated = folderIdSchema.parse({ id });
   const res = await httpClient.get(`/folders/${validated.id}`);
   return res.data;
 };
 
 /**
- * Get child folders (direct children only, or nested with filters)
+ * Get direct child folders and documents
  * Route: GET /api/folders/:id/children
- * Access: Private
+ * Access: Private - Requires 'view' permission on parent
  */
 export const getChildFolders = async (
   id: string,
-  params?: { includeDeleted?: boolean; type?: string; userEmail?: string }
-) => {
-  console.log('🚀 API Called with:', { id, params });
-  
+  params?: IGetChildFoldersParams
+): Promise<IFolderChildrenResponse> => {
   const validatedId = folderIdSchema.parse({ id });
   
-  const cleanParams = Object.fromEntries(
-    Object.entries(params || {}).filter(([_, value]) => value !== undefined)
-  );
-  
-  
-  const validatedParams = getChildFoldersSchema.parse(cleanParams);
-  
-  
-  const res = await httpClient.get(`/folders/${validatedId.id}/children`, {
-    params: validatedParams,
-  });
-  
-  return res.data;
-};
+  const cleanParams = params
+    ? Object.fromEntries(
+        Object.entries(params).filter(([_, value]) => value !== undefined)
+      )
+    : {};
 
-/**
- * Get all descendants (nested children recursively)
- * Route: GET /api/folders/:id/descendants
- * Access: Private
- */
-export const getAllDescendants = async (
-  id: string,
-  params?: { includeDeleted?: boolean; type?: string }
-) => {
-  const validatedId = folderIdSchema.parse({ id });
-  const validatedParams = getAllDescendantsSchema.parse(params || {});
-  const res = await httpClient.get(`/folders/${validatedId.id}/descendants`, {
+  const validatedParams = getChildFoldersSchema.parse(cleanParams);
+
+  const res = await httpClient.get(`/folders/${validatedId.id}/children`, {
     params: validatedParams,
   });
   return res.data;
@@ -106,209 +82,129 @@ export const getAllDescendants = async (
 /**
  * Get folder breadcrumbs (path hierarchy)
  * Route: GET /api/folders/:id/breadcrumbs
- * Access: Private
+ * Access: Private - Requires 'view' permission
  */
-export const getFolderBreadcrumbs = async (id: string) => {
+export const getFolderBreadcrumbs = async (
+  id: string
+): Promise<IFolderBreadcrumbsResponse> => {
   const validated = folderIdSchema.parse({ id });
   const res = await httpClient.get(`/folders/${validated.id}/breadcrumbs`);
   return res.data;
 };
 
 /**
- * Update folder details
- * Route: PUT /api/folders/:id
- * Access: Private
- */
-export const updateFolder = async (
-  id: string,
-  data: {
-    name?: string;
-    description?: string;
-    color?: string;
-  }
-) => {
-  const validatedId = folderIdSchema.parse({ id });
-  const validatedData = updateFolderSchema.parse(data);
-  const res = await httpClient.put(`/folders/${validatedId.id}`, validatedData);
-  return res.data;
-};
-
-/**
- * Move folder to a new parent
- * Route: POST /api/folders/:id/move
- * Access: Private
- */
-export const moveFolder = async (id: string, newParentId: string) => {
-  const validatedId = folderIdSchema.parse({ id });
-  const validatedData = moveFolderSchema.parse({ newParentId });
-  const res = await httpClient.post(`/folders/${validatedId.id}/move`, validatedData);
-  return res.data;
-};
-
-/**
- * Soft delete a folder
- * Route: DELETE /api/folders/:id
- * Access: Private
- */
-export const softDeleteFolder = async (id: string) => {
-  const validated = folderIdSchema.parse({ id });
-  const res = await httpClient.delete(`/folders/${validated.id}`);
-  return res.data;
-};
-
-/**
- * Restore a deleted folder
- * Route: POST /api/folders/:id/restore
- * Access: Private
- */
-export const restoreFolder = async (id: string) => {
-  const validated = folderIdSchema.parse({ id });
-  const res = await httpClient.post(`/folders/${validated.id}/restore`);
-  return res.data;
-};
-
-/**
- * Get folder statistics (child count, document count, total size)
+ * Get folder statistics
  * Route: GET /api/folders/:id/stats
- * Access: Private
+ * Access: Private - Requires 'view' permission
  */
-export const getFolderStats = async (id: string) => {
+export const getFolderStats = async (
+  id: string
+): Promise<IFolderStatsResponse> => {
   const validated = folderIdSchema.parse({ id });
   const res = await httpClient.get(`/folders/${validated.id}/stats`);
   return res.data;
 };
 
 /**
- * Search folders by name
- * Route: GET /api/folders/search
- * Access: Private
+ * Update folder details (name, description, color)
+ * Route: PUT /api/folders/:id
+ * Access: Private - Requires 'upload' permission
  */
-export const searchFolders = async (params: {
-  q: string;
-  departmentName?: string;
-}) => {
-  const validated = searchFoldersSchema.parse(params);
-  const res = await httpClient.get(`/folders/search`, { params: validated });
+export const updateFolder = async (
+  id: string,
+  payload: IUpdateFolderData
+): Promise<IFolderResponse> => {
+  const validatedId = folderIdSchema.parse({ id });
+  const validatedData = updateFolderSchema.parse(payload);
+  const res = await httpClient.put(`/folders/${validatedId.id}`, validatedData);
   return res.data;
 };
 
 /**
- * Get folder by path string
- * Route: GET /api/folders/by-path
- * Access: Private
+ * Move folder to new parent location
+ * Route: POST /api/folders/:id/move
+ * Access: Private - Requires 'delete' on source, 'upload' on destination
  */
-export const getFolderByPath = async (path: string) => {
-  const validated = getFolderByPathSchema.parse({ path });
-  const res = await httpClient.get(`/folders/by-path`, {
-    params: { path: validated.path },
-  });
+export const moveFolder = async (
+  id: string,
+  payload: IMoveFolderData
+): Promise<IMoveFolderResponse> => {
+  const validatedId = folderIdSchema.parse({ id });
+  const validatedData = moveFolderSchema.parse(payload);
+  const res = await httpClient.post(`/folders/${validatedId.id}/move`, validatedData);
   return res.data;
 };
 
-/* =======================================================
-   TYPE DEFINITIONS
-   ======================================================= */
+/**
+ * Soft delete folder (and all descendants)
+ * Route: DELETE /api/folders/:id
+ * Access: Private - Requires 'delete' permission
+ */
+export const softDeleteFolder = async (
+  id: string
+): Promise<IDeleteFolderResponse> => {
+  const validated = folderIdSchema.parse({ id });
+  const res = await httpClient.delete(`/folders/${validated.id}`);
+  return res.data;
+};
 
-export interface Folder {
-  _id: string;
-  name: string;
-  parent_id: string;
-  description?: string;
-  color: string;
-  path: string;
-  depth: number;
-  isDeleted: boolean;
-  deletedAt?: Date;
-  deletedBy?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | User;
-  updatedBy?: string | User;
-  type: "folder";
-}
+/**
+ * Restore soft deleted folder
+ * Route: POST /api/folders/:id/restore
+ * Access: Private - Requires 'delete' permission
+ */
+export const restoreFolder = async (
+  id: string
+): Promise<IRestoreFolderResponse> => {
+  const validated = folderIdSchema.parse({ id });
+  const res = await httpClient.post(`/folders/${validated.id}/restore`);
+  return res.data;
+};
 
-export interface User {
-  _id: string;
-  name: string;
-  email: string;
-  username?: string;
-}
+/**
+ * Search folders by name
+ * Route: GET /api/folders/search
+ * Access: Private - Returns only folders user has access to
+ */
+export const searchFolders = async (
+  params: ISearchFoldersParams
+): Promise<IFolderSearchResponse> => {
+  const validated = searchFoldersSchema.parse(params);
+  const res = await httpClient.get("/folders/search", { params: validated });
+  return res.data;
+};
 
-export interface Department {
-  _id: string;
-  name: string;
-  path: string;
-}
+/**
+ * Share folder with users/groups
+ * Route: POST /api/folders/:id/share
+ * Access: Private - Requires 'share' permission
+ */
+export const shareFolder = async (
+  id: string,
+  payload: IShareFolderData
+): Promise<IShareFolderResponse> => {
+  const validatedId = folderIdSchema.parse({ id });
+  const validatedData = shareFolderSchema.parse(payload);
+  const res = await httpClient.post(`/folders/${validatedId.id}/share`, validatedData);
+  return res.data;
+};
 
-export interface Breadcrumb {
-  id: string;
-  name: string;
-  path: string;
-  type: "department" | "folder";
-}
 
-export interface FolderWithDetails extends Folder {
-  department: Department | null;
-  breadcrumbs: Breadcrumb[];
-}
 
-export interface ChildItem {
-  _id: string;
-  name: string;
-  type: "folder" | "document";
-  parent_id: string;
-  path: string;
-  isDeleted: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  color?: string;
-  depth?: number;
-  size?: number;
-  sizeFormatted?: string;
-  extension?: string;
-  fileCategory?: string;
-}
-
-export interface FolderStats {
-  childFolders: number;
-  documents: number;
-  totalSize: number;
-  totalSizeFormatted: string;
-}
-
-export interface FolderListResponse {
-  success: boolean;
-  count: number;
-  data: Folder[];
-}
-
-export interface FolderResponse {
-  success: boolean;
-  message?: string;
-  data: Folder | FolderWithDetails;
-}
-
-export interface FolderChildrenResponse {
-  success: boolean;
-  count: number;
-  data: ChildItem[];
-}
-
-export interface FolderStatsResponse {
-  success: boolean;
-  data: FolderStats;
-}
-
-export interface FolderBreadcrumbsResponse {
-  success: boolean;
-  data: {
-    path: string;
-    breadcrumbs: Breadcrumb[];
-  };
-}
-
-export interface FolderSearchResponse {
-  success: boolean;
-  count: number;
-  data: FolderWithDetails[];
-}
+export type {
+  ICreateFolderData,
+  IUpdateFolderData,
+  IMoveFolderData,
+  IGetChildFoldersParams,
+  ISearchFoldersParams,
+  IShareFolderData,
+  IFolderResponse,
+  IFolderChildrenResponse,
+  IFolderStatsResponse,
+  IFolderBreadcrumbsResponse,
+  IFolderSearchResponse,
+  IDeleteFolderResponse,
+  IRestoreFolderResponse,
+  IMoveFolderResponse,
+  IShareFolderResponse,
+};

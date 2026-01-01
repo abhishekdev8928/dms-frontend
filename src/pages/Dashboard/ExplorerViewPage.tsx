@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import EmptyState from "@/components/RightPanelView/EmptyState";
@@ -10,9 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFolderMutations } from "@/hooks/mutations/useFolderMutations";
 import { useDocumentMutations } from "@/hooks/mutations/useDocumentMutations";
 import { useFolderQueries } from "@/hooks/queries/useFolderQueries";
-import { useDepartmentMutation } from "@/hooks/mutations/useDepartmentMutation";
-
-
+import { useDepartmentMutations } from "@/hooks/mutations/useDepartmentMutations";
 
 import FileInfoPanel from "@/components/RightPanelView/ResourcePreviewPanel";
 import GridView from "@/components/explorer/explorerView/GridView";
@@ -27,8 +24,8 @@ import { BreadcrumbNavigation } from "@/components/RightPanelView/BreadcrumbNavi
 import { BulkActionToolbar } from "@/components/RightPanelView/Actions/BulkActionToolbar";
 import { DepartmentModal } from "@/components/Modals/DepartmentModal";
 
-import type { FileItem } from "@/types/documentTypes";
-import type { Department } from "@/config/api/departmentApi";
+import type { FileItem } from "@/config/types/documentTypes";
+import type { IDepartment } from "@/config/types/departmentTypes";
 import { useAppConfigStore } from "@/config/store/useAppConfigStore";
 
 // Custom Hooks
@@ -42,15 +39,10 @@ import { useBreadcrumbNavigation } from "@/hooks/explorer/useBreadcrumbNavigatio
 import { ViewToggleButtons } from "@/components/explorer/explorerView/ViewToggleButtons";
 import { useSortItems } from "@/hooks/explorer/useSortedItems";
 import { ShareModal } from "@/components/Modals/CreateShareModal.";
-
-
-
-
-
+import { getAcceptAttribute } from "@/utils/helper/fileValidationHelpers";
 
 export default function ExplorerViewPage() {
   const { parentId } = useParams<{ parentId: string }>();
-  const queryClient = useQueryClient();
 
   // Store state - Read from store
   const viewMode = useAppConfigStore((state) => state.viewMode);
@@ -63,8 +55,9 @@ export default function ExplorerViewPage() {
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("");
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [reuploadDocumentId, setReuploadDocumentId] = useState<string | null>(null);
- 
+  const [reuploadDocumentId, setReuploadDocumentId] = useState<string | null>(
+    null
+  );
 
   // Fetch data
   const {
@@ -72,24 +65,25 @@ export default function ExplorerViewPage() {
     breadcrumbs,
     isChildrenLoading: isLoading,
     childrenError: error,
+    refetchChildren,
   } = useFolderQueries({
     parentId,
     selectedTypeFilter,
     selectedUser,
   });
 
-  
   const { sortedItems, sortField, sortOrder, handleSort } = useSortItems(items);
 
+  // Computed values - check if list is empty (no items at all)
+  const hasNoItems = items.length === 0;
+  // Check if filtered results are empty (has items but filters returned nothing)
+  const hasFilteredResults = sortedItems.length === 0 && items.length > 0;
+  // Check if truly empty (no items and no filters applied)
+  const isTrulyEmpty = hasNoItems && !selectedTypeFilter && !selectedUser;
+
   // Custom Hooks
-  
-  const {
-    selectedIds,
-    selectItem,
-    clearSelection,
-  } = useMultiSelect(sortedItems); // ✅ Use sortedItems
-
-
+  const { selectedIds, selectItem, clearSelection } =
+    useMultiSelect(sortedItems);
 
   const uploadHandlers = useUploadHandlers(
     parentId,
@@ -114,7 +108,10 @@ export default function ExplorerViewPage() {
 
   // Mutations
   const { createFolderMutation, updateFolderMutation, deleteFolderMutation } =
-    useFolderMutations(parentId, breadcrumbs);
+    useFolderMutations({
+      parentId,
+      breadcrumbs,
+    });
 
   const { updateDocumentMutation, deleteDocumentMutation, addTagsMutation } =
     useDocumentMutations(
@@ -124,10 +121,9 @@ export default function ExplorerViewPage() {
       setReuploadDocumentId
     );
 
-  const { updateMutation: updateDepartmentMutation } = useDepartmentMutation();
+  const { updateDepartmentMutation } = useDepartmentMutations();
 
   // Computed values
-  const isEmpty = sortedItems.length === 0; // ✅ Use sortedItems
   const isFolder = (item: FileItem | null): boolean =>
     item !== null && item.type === "folder";
 
@@ -137,15 +133,11 @@ export default function ExplorerViewPage() {
     item: { id: string; type: string },
     itemIndex: number
   ): void => {
-    selectItem(
-      item,
-      itemIndex,
-      {
-        shiftKey: e.shiftKey,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-      }
-    );
+    selectItem(item, itemIndex, {
+      shiftKey: e.shiftKey,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
+    });
   };
 
   // Department handlers
@@ -165,7 +157,7 @@ export default function ExplorerViewPage() {
     }
   };
 
-  const handleEditDepartment = (department: Department) => {
+  const handleEditDepartment = (department: IDepartment) => {
     modalState.openDepartmentModal("edit", department);
   };
 
@@ -204,13 +196,13 @@ export default function ExplorerViewPage() {
     }
   };
 
-
-useEffect(() => {
-    const totalSelected = selectedIds.fileIds.length + selectedIds.folderIds.length;
+  useEffect(() => {
+    const totalSelected =
+      selectedIds.fileIds.length + selectedIds.folderIds.length;
 
     if (totalSelected === 1) {
       const selectedId = selectedIds.fileIds[0] || selectedIds.folderIds[0];
-      const selectedItem = sortedItems.find((item) => item._id === selectedId); // ✅ Use sortedItems
+      const selectedItem = sortedItems.find((item) => item._id === selectedId);
 
       if (selectedItem) {
         modalState.setSelectedItem(selectedItem);
@@ -249,7 +241,8 @@ useEffect(() => {
 
             {/* Filter Buttons */}
             <div className="right-panel-filter">
-              {selectedIds.fileIds.length > 0 || selectedIds.folderIds.length > 0 ? (
+              {selectedIds.fileIds.length > 0 ||
+              selectedIds.folderIds.length > 0 ? (
                 <BulkActionToolbar
                   onClearSelection={clearSelection}
                   selectionCount={bulkActions.selectedCount}
@@ -257,12 +250,12 @@ useEffect(() => {
                 />
               ) : (
                 <FilterButtons
-  selectedTypeFilter={selectedTypeFilter}
-  setSelectedTypeFilter={setSelectedTypeFilter}
-  selectedUser={selectedUser}
-  setSelectedUser={setSelectedUser}
-  userData={userList}  // ✅ Pass array directly, not wrapped in object
-/>
+                  selectedTypeFilter={selectedTypeFilter}
+                  setSelectedTypeFilter={setSelectedTypeFilter}
+                  selectedUser={selectedUser}
+                  setSelectedUser={setSelectedUser}
+                  userData={userList}
+                />
               )}
             </div>
           </div>
@@ -270,10 +263,10 @@ useEffect(() => {
           {/* Scrollable Content Area */}
           <div
             className="flex-1 overflow-hidden"
-            onDragEnter={isEmpty ? dragAndDrop.handleDragEnter : undefined}
-            onDragLeave={isEmpty ? dragAndDrop.handleDragLeave : undefined}
-            onDragOver={isEmpty ? dragAndDrop.handleDragOver : undefined}
-            onDrop={isEmpty ? dragAndDrop.handleDrop : undefined}
+            onDragEnter={isTrulyEmpty ? dragAndDrop.handleDragEnter : undefined}
+            onDragLeave={isTrulyEmpty ? dragAndDrop.handleDragLeave : undefined}
+            onDragOver={isTrulyEmpty ? dragAndDrop.handleDragOver : undefined}
+            onDrop={isTrulyEmpty ? dragAndDrop.handleDrop : undefined}
           >
             {isLoading ? (
               <div className="flex items-center justify-center h-full text-gray-500">
@@ -282,50 +275,44 @@ useEffect(() => {
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <p className="text-red-600 mb-4">Failed to load folder</p>
-                <Button
-                  onClick={() =>
-                    queryClient.invalidateQueries({
-                      queryKey: ["children", parentId],
-                    })
-                  }
-                >
-                  Retry
-                </Button>
+                <Button onClick={() => refetchChildren()}>Retry</Button>
               </div>
-            ) : isEmpty ? (
-              selectedTypeFilter?.trim() !== "" || selectedUser?.trim() !== "" ? (
-                <div className="flex flex-col items-center justify-center h-full text-center text-gray-600">
-                  <img
-                    src="https://ssl.gstatic.com/docs/doclist/images/empty_state_recents_v4.svg"
-                    alt="No matching results"
-                    className="w-64 mb-6 opacity-80"
-                  />
-                  <h2 className="text-xl font-semibold">No matching results</h2>
-                  <p className="text-gray-500 mt-2">
-                    Adjust your filters or try searching again.
-                  </p>
-                </div>
-              ) : (
-                <div className="h-full">
-                  <EmptyState
-                    onUpload={() => uploadHandlers.fileInputRef.current?.click()}
-                    dragActive={dragAndDrop.dragActive}
-                    onCreateFolder={() => modalState.setCreateFolderModalOpen(true)}
-                  />
-                </div>
-              )
+            ) : hasFilteredResults ? (
+              <div className="flex flex-col items-center justify-center h-full text-center text-gray-600">
+                <img
+                  src="https://ssl.gstatic.com/docs/doclist/images/empty_state_recents_v4.svg"
+                  alt="No matching results"
+                  className="w-64 mb-6 opacity-80"
+                />
+                <h2 className="text-xl font-semibold">No matching results</h2>
+                <p className="text-gray-500 mt-2">
+                  Adjust your filters or try searching again.
+                </p>
+              </div>
+            ) : isTrulyEmpty ? (
+              <div className="h-full">
+                <EmptyState
+                  onUpload={() => uploadHandlers.fileInputRef.current?.click()}
+                  dragActive={dragAndDrop.dragActive}
+                  onCreateFolder={() =>
+                    modalState.setCreateFolderModalOpen(true)
+                  }
+                />
+              </div>
             ) : (
               <ScrollArea className="h-full">
                 <div className="p-6">
                   {viewMode === "list" ? (
-                     <ListView
+                    <ListView
                       selectedIds={selectedIds}
                       onSelectItem={handleItemSelection}
-                      items={sortedItems} 
-                      sortField={sortField} 
+                      items={sortedItems}
+                      sortField={sortField}
                       sortOrder={sortOrder}
-                      onSort={handleSort} 
-                      onItemClick={(item) => itemActions.handleItemClick(item, clearSelection)}
+                      onSort={handleSort}
+                      onItemClick={(item) =>
+                        itemActions.handleItemClick(item, clearSelection)
+                      }
                       onRename={itemActions.handleRename}
                       onDelete={itemActions.handleDelete}
                       onDownload={itemActions.handleDownload}
@@ -333,14 +320,15 @@ useEffect(() => {
                       onAddTags={itemActions.handleAddTags}
                       onReupload={uploadHandlers.handleReupload}
                       onShare={itemActions.handleShare}
-                      
                     />
                   ) : (
                     <GridView
-                      items={sortedItems} // ✅ Pass sortedItems instead of items
+                      items={sortedItems}
                       selectedIds={selectedIds}
                       onSelectItem={handleItemSelection}
-                      onItemClick={(item) => itemActions.handleItemClick(item, clearSelection)}
+                      onItemClick={(item) =>
+                        itemActions.handleItemClick(item, clearSelection)
+                      }
                       onRename={itemActions.handleRename}
                       onDelete={itemActions.handleDelete}
                       onDownload={itemActions.handleDownload}
@@ -354,12 +342,11 @@ useEffect(() => {
             )}
           </div>
 
-          {/* Hidden file inputs */}
           <input
             ref={uploadHandlers.fileInputRef}
             type="file"
             multiple
-            accept={uploadHandlers.ALLOWED_EXTENSIONS.join(",")}
+            accept={getAcceptAttribute()}
             onChange={(e) => {
               uploadHandlers.handleFileUpload(e.target.files);
               e.target.value = "";
@@ -370,7 +357,7 @@ useEffect(() => {
           <input
             ref={uploadHandlers.reuploadInputRef}
             type="file"
-            accept={uploadHandlers.ALLOWED_EXTENSIONS.join(",")}
+            accept={getAcceptAttribute()}
             onChange={uploadHandlers.handleReuploadFileChange}
             className="hidden"
           />
@@ -407,7 +394,7 @@ useEffect(() => {
           try {
             await createFolderMutation.mutateAsync({
               ...data,
-              parent_id: parentId || "",
+              parentId: parentId || "",
             });
             modalState.setCreateFolderModalOpen(false);
           } catch (error) {
@@ -447,8 +434,7 @@ useEffect(() => {
             try {
               await updateFolderMutation.mutateAsync({
                 id: modalState.selectedItem._id,
-                name: data.name,
-                color: data.color,
+                ...data,
               });
               modalState.setRenameModalOpen(false);
             } catch (error) {
@@ -464,7 +450,9 @@ useEffect(() => {
         onOpenChange={modalState.setDeleteModalOpen}
         item={modalState.selectedItem}
         onConfirm={handleDeleteConfirm}
-        isLoading={deleteFolderMutation.isPending || deleteDocumentMutation.isPending}
+        isLoading={
+          deleteFolderMutation.isPending || deleteDocumentMutation.isPending
+        }
       />
 
       <DepartmentModal
@@ -501,8 +489,11 @@ useEffect(() => {
         isLoading={addTagsMutation.isPending}
       />
 
-
-      <ShareModal isOpen={modalState.shareModalOpen} item={modalState.selectedItem}  onOpenChange={modalState.openShareModal}  />
+      <ShareModal
+        isOpen={modalState.shareModalOpen}
+        item={modalState.selectedItem}
+        onOpenChange={modalState.openShareModal}
+      />
     </div>
   );
 }

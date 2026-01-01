@@ -70,7 +70,7 @@ export const useDocumentMutations = (
   const deleteDocumentMutation = useMutation({
     mutationFn: deleteDocument,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["children", parentId] });
+      queryClient.invalidateQueries({ queryKey: ["folder-children", parentId] });
       toast.success("File moved to trash", {
         description: "You can restore it from trash",
       });

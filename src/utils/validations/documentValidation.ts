@@ -1,11 +1,13 @@
-import { z } from "zod";
-import DOMPurify from "dompurify";
+// validations/documentValidation.ts
+
+import { z } from 'zod';
+import DOMPurify from 'dompurify';
 
 /* =======================================================
    SANITIZATION HELPER
    ======================================================= */
 
-const sanitize = (value: string) => {
+const sanitize = (value: string): string => {
   return DOMPurify.sanitize(value.trim(), {
     ALLOWED_TAGS: [],
     ALLOWED_ATTR: [],
@@ -13,298 +15,353 @@ const sanitize = (value: string) => {
 };
 
 /* =======================================================
-   COMMON VALIDATORS
+   BASE VALIDATORS
    ======================================================= */
 
-const mongoIdValidator = z
+const mongoIdSchema = z
   .string()
-  .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ID")
+  .regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ID')
   .transform(sanitize);
 
-// S3 Key validator (instead of URL validator)
-// Allows common characters in S3 keys including spaces, parentheses, etc.
-const s3KeyValidator = z
+const s3KeySchema = z
   .string()
-  .min(1, "S3 key is required")
-  .max(1024, "S3 key too long")
+  .min(1, 'S3 key is required')
+  .max(1024, 'S3 key too long')
   .regex(
     /^[a-zA-Z0-9\s\/_\-\.()!@#$%^&+=]+$/,
-    "S3 key contains invalid characters"
+    'S3 key contains invalid characters'
   )
   .transform(sanitize);
 
-// Extension validator - NO DOT, just the extension (e.g., "png", "pdf")
-const fileExtensionValidator = z
+const fileExtensionSchema = z
   .string()
-  .regex(/^[a-zA-Z0-9]+$/, "Invalid file extension format")
+  .regex(/^[a-zA-Z0-9]+$/, 'Invalid file extension')
   .transform((val) => {
-    // Remove dot if present, then lowercase and sanitize
     const noDot = val.startsWith('.') ? val.slice(1) : val;
     return sanitize(noDot.toLowerCase());
   });
 
-const mimeTypeValidator = z
+const mimeTypeSchema = z
   .string()
-  .regex(
-    /^[a-zA-Z0-9]+\/[a-zA-Z0-9\-\+\.]+$/,
-    "Invalid MIME type format"
-  )
+  .regex(/^[a-zA-Z0-9]+\/[a-zA-Z0-9\-\+\.]+$/, 'Invalid MIME type')
   .transform(sanitize);
 
-const filenameValidator = z
+const filenameSchema = z
   .string()
-  .min(1, "Filename is required")
-  .max(255, "Filename too long")
-  .regex(
-    /^[a-zA-Z0-9\s\-_\.()]+$/,
-    "Filename contains invalid characters"
-  )
+  .min(1, 'Filename is required')
+  .max(255, 'Filename too long')
+  .regex(/^[a-zA-Z0-9\s\-_\.()]+$/, 'Invalid filename characters')
   .transform(sanitize);
 
-const tagValidator = z
+const tagSchema = z
   .string()
-  .min(1, "Tag cannot be empty")
-  .max(50, "Tag too long")
-  .regex(/^[a-zA-Z0-9\-_]+$/, "Tag can only contain letters, numbers, hyphens, and underscores")
+  .min(1, 'Tag cannot be empty')
+  .max(50, 'Tag too long')
+  .regex(/^[a-zA-Z0-9\-_]+$/, 'Invalid tag format')
   .transform(sanitize);
+
+const descriptionSchema = z
+  .string()
+  .max(1000, 'Description too long')
+  .transform(sanitize)
+  .optional();
+
+const tagsArraySchema = z
+  .array(tagSchema)
+  .max(20, 'Maximum 20 tags allowed')
+  .optional();
+
+const permissionSchema = z.enum(['view', 'download', 'upload', 'delete', 'share']);
 
 /* =======================================================
-   DOCUMENT VALIDATION SCHEMAS
+   GENERATE PRESIGNED URLS
    ======================================================= */
 
-// Generate presigned upload URLs
 export const generatePresignedUrlsSchema = z.object({
-  files: z
-    .array(
-      z.object({
-        filename: filenameValidator,
-        mimeType: mimeTypeValidator,
-      })
-    )
-    .min(1, "At least one file is required")
-    .max(100, "Maximum 100 files allowed per request"),
-    parent_id: z.string(),
+  body: z.object({
+    files: z
+      .array(
+        z.object({
+          filename: filenameSchema,
+          mimeType: mimeTypeSchema,
+        })
+      )
+      .min(1, 'At least one file required')
+      .max(100, 'Maximum 100 files per request'),
+    parentId: mongoIdSchema,
+  }),
 });
 
-// Create document
+/* =======================================================
+   CREATE DOCUMENT
+   ======================================================= */
+
 export const createDocumentSchema = z.object({
-  name: filenameValidator,
-  originalName: filenameValidator,
-  parent_id: mongoIdValidator,
-  fileUrl: s3KeyValidator, // Changed from URL validator to S3 key validator
-  mimeType: mimeTypeValidator,
-  extension: fileExtensionValidator, // Now auto-adds dot if missing
-  size: z
-    .number()
-    .int("Size must be an integer")
-    .positive("Size must be positive")
-    .max(5 * 1024 * 1024 * 1024, "File size exceeds 5GB limit"), // 5GB max
-  description: z
-    .string()
-    .max(1000, "Description too long")
-    .transform(sanitize)
-    .optional(),
-  tags: z
-    .array(tagValidator)
-    .max(20, "Maximum 20 tags allowed")
-    .optional(),
+  body: z.object({
+    name: filenameSchema,
+    originalName: filenameSchema,
+    parentId: mongoIdSchema,
+    fileUrl: s3KeySchema,
+    mimeType: mimeTypeSchema,
+    extension: fileExtensionSchema,
+    size: z
+      .number()
+      .int('Size must be integer')
+      .positive('Size must be positive')
+      .max(5 * 1024 * 1024 * 1024, 'File exceeds 5GB limit'),
+    description: descriptionSchema,
+    tags: tagsArraySchema,
+  }),
 });
 
-// Document ID
-export const documentIdSchema = z.object({
-  id: mongoIdValidator,
+/* =======================================================
+   DOCUMENT OPERATIONS
+   ======================================================= */
+
+export const getDocumentByIdSchema = z.object({
+  params: z.object({
+    id: mongoIdSchema,
+  }),
 });
 
-// Get documents by parent
-export const getDocumentsByParentSchema = z.object({
-  parentId: mongoIdValidator,
-  includeDeleted: z.boolean().default(false).optional(),
+export const documentOperationSchema = z.object({
+  params: z.object({
+    id: mongoIdSchema,
+  }),
 });
 
-// Get recent documents
-export const getRecentDocumentsSchema = z.object({
-  departmentId: mongoIdValidator,
-  limit: z
-    .number()
-    .int()
-    .positive()
-    .min(1)
-    .max(100)
-    .default(10)
-    .optional(),
-});
-
-// Update document
 export const updateDocumentSchema = z.object({
-  name: filenameValidator.optional(),
-  description: z
-    .string()
-    .max(1000, "Description too long")
-    .transform(sanitize)
-    .optional(),
-  tags: z
-    .array(tagValidator)
-    .max(20, "Maximum 20 tags allowed")
-    .optional(),
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+  body: z.object({
+    name: filenameSchema.optional(),
+    description: descriptionSchema,
+    tags: tagsArraySchema,
+  }),
 });
 
-// Move document
 export const moveDocumentSchema = z.object({
-  newParentId: mongoIdValidator,
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+  body: z.object({
+    newParentId: mongoIdSchema,
+  }),
 });
 
-// Search documents
+/* =======================================================
+   SEARCH & FILTER
+   ======================================================= */
+
 export const searchDocumentsSchema = z.object({
-  q: z
-    .string()
-    .min(1, "Search query is required")
-    .max(200, "Search query too long")
-    .transform(sanitize),
-  departmentId: mongoIdValidator.optional(),
-  limit: z
-    .number()
-    .int()
-    .positive()
-    .min(1)
-    .max(100)
-    .default(20)
-    .optional(),
+  query: z.object({
+    q: z
+      .string()
+      .min(1, 'Search query required')
+      .max(200, 'Query too long')
+      .transform(sanitize),
+    departmentId: mongoIdSchema.optional(),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .min(1)
+      .max(100)
+      .default(20)
+      .optional(),
+  }),
 });
 
-// Find by extension
-export const findByExtensionSchema = z.object({
-  ext: z
-    .string()
-    .regex(/^[a-zA-Z0-9]+$/, "Invalid extension format (no dots)")
-    .transform(sanitize),
+export const getRecentDocumentsSchema = z.object({
+  params: z.object({
+    departmentId: mongoIdSchema,
+  }),
+  query: z.object({
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .min(1)
+      .max(100)
+      .default(10)
+      .optional(),
+  }).optional(),
 });
 
 /* =======================================================
-   VERSION VALIDATION SCHEMAS
+   TAG OPERATIONS
    ======================================================= */
 
-// Create version
+export const tagsOperationSchema = z.object({
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+  body: z.object({
+    tags: z
+      .array(tagSchema)
+      .min(1, 'At least one tag required')
+      .max(20, 'Maximum 20 tags allowed'),
+  }),
+});
+
+/* =======================================================
+   VERSION OPERATIONS
+   ======================================================= */
+
 export const createVersionSchema = z.object({
-  fileUrl: s3KeyValidator, // Changed from URL validator to S3 key validator
-  size: z
-    .number()
-    .int("Size must be an integer")
-    .positive("Size must be positive")
-    .max(5 * 1024 * 1024 * 1024, "File size exceeds 5GB limit"),
-  mimeType: mimeTypeValidator,
-  extension: fileExtensionValidator, // Now auto-adds dot if missing
-  name: filenameValidator.optional(),
-  originalName: filenameValidator.optional(),
-  changeDescription: z
-    .string()
-    .max(500, "Change description too long")
-    .transform(sanitize)
-    .optional(),
-  fileHash: z
-    .string()
-    .regex(/^[a-fA-F0-9]{32,128}$/, "Invalid file hash format")
-    .transform(sanitize)
-    .optional(),
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+  body: z.object({
+    fileUrl: s3KeySchema,
+    size: z
+      .number()
+      .int()
+      .positive()
+      .max(5 * 1024 * 1024 * 1024),
+    mimeType: mimeTypeSchema,
+    extension: fileExtensionSchema,
+    name: filenameSchema.optional(),
+    originalName: filenameSchema.optional(),
+    changeDescription: z
+      .string()
+      .max(500, 'Description too long')
+      .transform(sanitize)
+      .optional(),
+  }),
 });
 
-// Get all versions options
 export const getAllVersionsSchema = z.object({
-  sort: z.enum(["asc", "desc"]).default("desc").optional(),
-  limit: z
-    .number()
-    .int()
-    .positive()
-    .min(1)
-    .max(100)
-    .optional(),
-  populate: z.boolean().default(false).optional(),
+  params: z.object({
+    id: mongoIdSchema,
+  }),
 });
 
-// Version number
-export const versionNumberSchema = z.object({
-  versionNumber: z
-    .number()
-    .int("Version number must be an integer")
-    .positive("Version number must be positive")
-    .min(1, "Version number must be at least 1"),
+export const getVersionByNumberSchema = z.object({
+  params: z.object({
+    id: mongoIdSchema,
+    versionNumber: z.union([
+      z.string().regex(/^\d+$/).transform(Number),
+      mongoIdSchema,
+    ]),
+  }),
 });
 
-// Revert to version
 export const revertToVersionSchema = z.object({
-  versionNumber: z
-    .number()
-    .int("Version number must be an integer")
-    .positive("Version number must be positive")
-    .min(1, "Version number must be at least 1"),
-});
-
-// Delete old versions
-export const deleteOldVersionsSchema = z.object({
-  keepCount: z
-    .number()
-    .int()
-    .positive()
-    .min(1, "Must keep at least 1 version")
-    .max(100, "Keep count too high")
-    .default(5),
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+  body: z.object({
+    versionNumber: z
+      .number()
+      .int()
+      .positive()
+      .min(1, 'Version must be at least 1'),
+  }),
 });
 
 /* =======================================================
-   TAG VALIDATION SCHEMAS
+   CHUNKED UPLOAD
    ======================================================= */
 
-// Add/Remove tags
-export const tagsSchema = z.object({
-  tags: z
-    .array(tagValidator)
-    .min(1, "At least one tag is required")
-    .max(20, "Maximum 20 tags allowed"),
+export const initiateChunkedUploadSchema = z.object({
+  body: z.object({
+    filename: filenameSchema,
+    mimeType: mimeTypeSchema,
+    fileSize: z
+      .number()
+      .int()
+      .positive()
+      .min(100 * 1024 * 1024, 'File must be at least 100MB for chunked upload')
+      .max(5 * 1024 * 1024 * 1024, 'File exceeds 5GB limit'),
+    parentId: mongoIdSchema,
+  }),
 });
 
-// Find by tags
-export const findByTagsSchema = z.object({
-  tags: z
-    .array(tagValidator)
-    .min(1, "At least one tag is required")
-    .max(10, "Maximum 10 tags for search"),
+export const uploadChunkSchema = z.object({
+  body: z.object({
+    uploadId: z.string().min(1),
+    key: s3KeySchema,
+    partNumber: z
+      .number()
+      .int()
+      .positive()
+      .min(1)
+      .max(10000),
+    body: z.union([z.instanceof(Buffer), z.string()]),
+  }),
+});
+
+export const completeChunkedUploadSchema = z.object({
+  body: z.object({
+    uploadId: z.string().min(1),
+    key: s3KeySchema,
+    parts: z
+      .array(
+        z.object({
+          ETag: z.string().min(1),
+          PartNumber: z.number().int().positive(),
+        })
+      )
+      .min(1),
+    name: filenameSchema,
+    parentId: mongoIdSchema,
+    mimeType: mimeTypeSchema.optional(),
+    fileSize: z.number().int().positive().optional(),
+    description: descriptionSchema,
+    tags: tagsArraySchema,
+  }),
+});
+
+export const abortChunkedUploadSchema = z.object({
+  body: z.object({
+    uploadId: z.string().min(1),
+    key: s3KeySchema,
+  }),
 });
 
 /* =======================================================
-   COMBINED SCHEMAS (for API with both ID and data)
+   SHARE DOCUMENT
    ======================================================= */
 
-// Document ID + Update data
-export const updateDocumentWithIdSchema = z.object({
-  id: mongoIdValidator,
-  data: updateDocumentSchema,
-});
-
-// Document ID + Move data
-export const moveDocumentWithIdSchema = z.object({
-  id: mongoIdValidator,
-  newParentId: mongoIdValidator,
-});
-
-// Document ID + Version data
-export const createVersionWithIdSchema = z.object({
-  id: mongoIdValidator,
-  data: createVersionSchema,
-});
-
-// Document ID + Version number
-export const documentVersionSchema = z.object({
-  id: mongoIdValidator,
-  versionNumber: z
-    .number()
-    .int()
-    .positive()
-    .min(1),
-});
-
-// Document ID + Tags
-export const documentTagsSchema = z.object({
-  id: mongoIdValidator,
-  tags: z.array(tagValidator).min(1).max(20),
+export const shareDocumentSchema = z.object({
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+  body: z
+    .object({
+      users: z
+        .array(
+          z.object({
+            userId: mongoIdSchema,
+            permissions: z
+              .array(permissionSchema)
+              .min(1)
+              .max(5),
+          })
+        )
+        .optional(),
+      groups: z
+        .array(
+          z.object({
+            groupId: mongoIdSchema,
+            permissions: z
+              .array(permissionSchema)
+              .min(1)
+              .max(5),
+          })
+        )
+        .optional(),
+    })
+    .refine(
+      (data) =>
+        (data.users && data.users.length > 0) ||
+        (data.groups && data.groups.length > 0),
+      {
+        message: 'At least one user or group required',
+      }
+    ),
 });
 
 /* =======================================================
@@ -313,25 +370,18 @@ export const documentTagsSchema = z.object({
 
 export type GeneratePresignedUrlsInput = z.infer<typeof generatePresignedUrlsSchema>;
 export type CreateDocumentInput = z.infer<typeof createDocumentSchema>;
-export type DocumentIdInput = z.infer<typeof documentIdSchema>;
-export type GetDocumentsByParentInput = z.infer<typeof getDocumentsByParentSchema>;
-export type GetRecentDocumentsInput = z.infer<typeof getRecentDocumentsSchema>;
+export type GetDocumentByIdInput = z.infer<typeof getDocumentByIdSchema>;
 export type UpdateDocumentInput = z.infer<typeof updateDocumentSchema>;
 export type MoveDocumentInput = z.infer<typeof moveDocumentSchema>;
 export type SearchDocumentsInput = z.infer<typeof searchDocumentsSchema>;
-export type FindByExtensionInput = z.infer<typeof findByExtensionSchema>;
-
+export type GetRecentDocumentsInput = z.infer<typeof getRecentDocumentsSchema>;
+export type TagsOperationInput = z.infer<typeof tagsOperationSchema>;
 export type CreateVersionInput = z.infer<typeof createVersionSchema>;
 export type GetAllVersionsInput = z.infer<typeof getAllVersionsSchema>;
-export type VersionNumberInput = z.infer<typeof versionNumberSchema>;
+export type GetVersionByNumberInput = z.infer<typeof getVersionByNumberSchema>;
 export type RevertToVersionInput = z.infer<typeof revertToVersionSchema>;
-export type DeleteOldVersionsInput = z.infer<typeof deleteOldVersionsSchema>;
-
-export type TagsInput = z.infer<typeof tagsSchema>;
-export type FindByTagsInput = z.infer<typeof findByTagsSchema>;
-
-export type UpdateDocumentWithIdInput = z.infer<typeof updateDocumentWithIdSchema>;
-export type MoveDocumentWithIdInput = z.infer<typeof moveDocumentWithIdSchema>;
-export type CreateVersionWithIdInput = z.infer<typeof createVersionWithIdSchema>;
-export type DocumentVersionInput = z.infer<typeof documentVersionSchema>;
-export type DocumentTagsInput = z.infer<typeof documentTagsSchema>;
+export type InitiateChunkedUploadInput = z.infer<typeof initiateChunkedUploadSchema>;
+export type UploadChunkInput = z.infer<typeof uploadChunkSchema>;
+export type CompleteChunkedUploadInput = z.infer<typeof completeChunkedUploadSchema>;
+export type AbortChunkedUploadInput = z.infer<typeof abortChunkedUploadSchema>;
+export type ShareDocumentInput = z.infer<typeof shareDocumentSchema>;

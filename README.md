@@ -309,3 +309,42 @@ After completing all steps:
 ---
 
 **Happy Refactoring! 🎉**
+
+
+
+
+
+
+
+
+
+✅ Complete Chunked Upload Implementation Done!
+What I've Built:
+
+Auto-Detection Logic:
+
+Files ≤100MB → Direct upload (single PUT to S3)
+Files >100MB → Chunked upload (multipart)
+
+
+Chunked Upload Flow:
+
+   1. initiateChunkedUpload() → Get S3 multipart uploadId
+   2. Loop through chunks (5MB each)
+      - uploadChunk() for each part
+      - Track progress in store
+   3. completeChunkedUpload() → Finalize & create document
+
+Features Implemented:
+
+✅ Progress tracking per chunk
+✅ Cancellation support (aborts S3 multipart upload)
+✅ Error handling per chunk
+✅ Mixed uploads (some direct, some chunked in same batch)
+✅ Store integration with totalChunks and uploadedChunks
+
+
+Store Updates:
+
+Direct uploads: method: 'direct', totalChunks: 0
+Chunked uploads: method: 'chunked', totalChunks: X, updates uploadedChunks

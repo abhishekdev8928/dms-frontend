@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getDocumentById } from '@/config/api/documentApi';
 import { getFolderById } from '@/config/api/folderApi';
 import { getFileActivity, getFolderActivity } from '@/config/api/activityApi';
-import type { FileItem } from '@/types/documentTypes';
+import type { FileItem } from '@/config/types/documentTypes';
 import type { Activity } from '@/config/api/activityApi';
 import { getFileIcon as getFileIconType } from '@/constants/getIcons';
 
@@ -75,14 +75,14 @@ export default function   ResourcePreviewPanel({ item, selectionCount, onClose }
 
   if (selectionCount > 1) {
     return (
-      <div className="w-[350px] pb-6 rounded-[16px] bg-white h-full flex flex-col">
+      <div className="w-[350px] pb-6 rounded-2xl bg-white h-full flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <h2 className="text-base font-normal text-gray-900">{selectionCount} items selected</h2>
           </div>
           <button 
             onClick={onClose}
-            className="ml-2 p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+            className="ml-2 p-2 hover:bg-gray-100 rounded-full transition-colors shrink-0"
           >
             <X className="w-5 h-5 text-gray-700" />
           </button>
@@ -114,14 +114,14 @@ export default function   ResourcePreviewPanel({ item, selectionCount, onClose }
 
   if (!item) {
     return (
-      <div className="w-[360px] rounded-[16px] bg-white h-full flex flex-col">
+      <div className="w-[360px] rounded-2xl bg-white h-full flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <h2 className="text-base font-normal text-gray-900">My Drive</h2>
           </div>
           <button 
             onClick={onClose}
-            className="ml-2 p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+            className="ml-2 p-2 hover:bg-gray-100 rounded-full transition-colors shrink-0"
           >
             <X className="w-5 h-5 text-gray-700" />
           </button>

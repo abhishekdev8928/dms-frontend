@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   MoreVertical,
   Pencil,
@@ -15,6 +16,7 @@ import {
   FolderInput,
   Star,
   StarOff,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,24 +35,32 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useMutationAddStarred, useMutationRemoveStarred } from "@/hooks/mutations/useStarredMutation";
+import {
+  useMutationAddStarred,
+  useMutationRemoveStarred,
+} from "@/hooks/mutations/useStarredMutation";
 
-import type { FileItem } from "@/types/documentTypes";
+import type { IChildItem } from "@/config/types/folderTypes";
+
+interface OwnerColumnConfig {
+  label: "Owner" | "Shared By";
+  dataKey: "createdBy" | "sharedBy";
+}
 
 interface ListViewProps {
-  items: FileItem[];
+  items: IChildItem[];
   sortField: "name" | "date";
   sortOrder: "asc" | "desc";
   onSort: (field: "name" | "date") => void;
-  onItemClick: (item: FileItem) => void;
-  onRename: (item: FileItem) => void;
-  onDelete: (item: FileItem) => void;
-  onDownload: (item: FileItem) => void;
-  onShowInfo: (item: FileItem) => void;
-  onAddTags: (item: FileItem) => void;
+  onItemClick: (item: IChildItem) => void;
+  onRename: (item: IChildItem) => void;
+  onDelete: (item: IChildItem) => void;
+  onDownload: (item: IChildItem) => void;
+  onShowInfo: (item: IChildItem, tab?: string) => void;
+  onAddTags: (item: IChildItem) => void;
   onReupload: (documentId: string) => void;
-  onShare: (item: FileItem) => void;
-  onMove?: (item: FileItem) => void;
+  onShare: (item: IChildItem) => void;
+  onMove?: (item: IChildItem) => void;
   selectedIds: {
     fileIds: string[];
     folderIds: string[];
@@ -60,7 +70,23 @@ interface ListViewProps {
     item: { id: string; type: string },
     itemIndex: number
   ) => void;
+  ownerColumnConfig?: OwnerColumnConfig;
 }
+
+const formatFileSize = (bytes: number | undefined): string => {
+  if (!bytes || bytes === 0) return "—";
+
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = bytes;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+
+  return `${size.toFixed(2)} ${units[unitIndex]}`;
+};
 
 export default function ListView({
   items,
@@ -78,10 +104,15 @@ export default function ListView({
   onSelectItem,
   onShare,
   onMove,
+  ownerColumnConfig = { label: "Owner", dataKey: "createdBy" },
 }: ListViewProps) {
   // Starred mutations
+  const queryClient = useQueryClient();
+  
   const addStarred = useMutationAddStarred({
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["folder-children"] });
+      queryClient.invalidateQueries({ queryKey: ["shared-with-me"] });
       toast.success(data.message || "Added to starred successfully");
     },
     onError: (error: any) => {
@@ -91,27 +122,31 @@ export default function ListView({
 
   const removeStarred = useMutationRemoveStarred({
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["folder-children"] });
+      queryClient.invalidateQueries({ queryKey: ["shared-with-me"] });
       toast.success(data.message || "Removed from starred successfully");
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Failed to remove from starred");
+      toast.error(
+        error?.response?.data?.message || "Failed to remove from starred"
+      );
     },
   });
 
-  const handleToggleStarred = (item: FileItem, e: React.MouseEvent) => {
+  const handleToggleStarred = (item: IChildItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    if (item.starred) {
-      removeStarred.mutate({ id: item._id, type: item.type });
-    } else {
-      addStarred.mutate({ id: item._id, type: item.type });
-    }
-  };
 
-  // Check permission helper
-  const canDo = (item: FileItem, action: string) => {
-    if (!item.allowedActions) return true;
-    return item.allowedActions[action] !== false;
+    if (item.isStarred) {
+      removeStarred.mutate({
+        id: item._id,
+        type: item.type === "folder" ? "folder" : "file",
+      });
+    } else {
+      addStarred.mutate({
+        id: item._id,
+        type: item.type === "folder" ? "folder" : "file",
+      });
+    }
   };
 
   const formatDate = (dateString: string): string => {
@@ -121,14 +156,7 @@ export default function ListView({
     });
   };
 
-  const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return "—";
-    const kb = bytes / 1024;
-    if (kb < 1024) return `${kb.toFixed(1)} KB`;
-    return `${(kb / 1024).toFixed(1)} MB`;
-  };
-
-  const isFolder = (item: FileItem) => item.type === "folder";
+  const isFolder = (item: IChildItem) => item.type === "folder";
 
   const getInitials = (name: string) =>
     name
@@ -138,13 +166,23 @@ export default function ListView({
       .toUpperCase()
       .slice(0, 2);
 
-  const getCreatorInfo = (item: FileItem) => {
-    const username = item.createdBy.username || "Unknown";
+  const getUserInfo = (item: IChildItem) => {
+    // Get user based on the configured dataKey
+    const user = item[ownerColumnConfig.dataKey];
+    const username = user?.username || "Unknown";
+    
     return {
       username,
-      email: item.createdBy.email || "",
+      email: user?.email || "",
       initials: username !== "Unknown" ? getInitials(username) : "UN",
     };
+  };
+
+  // ✅ FIX: Check if item is selected (same as GridView)
+  const isItemSelected = (item: IChildItem): boolean => {
+    return item.type === "folder"
+      ? selectedIds.folderIds.includes(item._id)
+      : selectedIds.fileIds.includes(item._id);
   };
 
   return (
@@ -153,7 +191,7 @@ export default function ListView({
         <div className="bg-white rounded-lg overflow-x-scroll">
           <div>
             <table className="w-full min-w-[900px]">
-              <thead className="bg-[#fff] sticky top-0 z-10">
+              <thead className="bg-white sticky top-0 z-10">
                 <tr className="border-b border-gray-200">
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -170,9 +208,25 @@ export default function ListView({
                                 : "opacity-0 group-hover:opacity-100"
                             }`}
                           >
-                            <svg width="23" height="23" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <rect width="22.1333" height="22.1333" rx="3.2" fill="#035C4C"/>
-                              <path d="M6.40039 11.0666L11.0671 6.3999M11.0671 6.3999L15.7337 11.0666M11.0671 6.3999V15.7332" stroke="white" strokeWidth="1.2" strokeLinecap="square"/>
+                            <svg
+                              width="23"
+                              height="23"
+                              viewBox="0 0 23 23"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <rect
+                                width="22.1333"
+                                height="22.1333"
+                                rx="3.2"
+                                fill="#035C4C"
+                              />
+                              <path
+                                d="M6.40039 11.0666L11.0671 6.3999M11.0671 6.3999L15.7337 11.0666M11.0671 6.3999V15.7332"
+                                stroke="white"
+                                strokeWidth="1.2"
+                                strokeLinecap="square"
+                              />
                             </svg>
                           </span>
                         </div>
@@ -180,13 +234,15 @@ export default function ListView({
                     </TooltipTrigger>
                     <TooltipContent>
                       {sortField === "name"
-                        ? `Click to sort ${sortOrder === "asc" ? "Z → A" : "A → Z"}`
+                        ? `Click to sort ${
+                            sortOrder === "asc" ? "Z → A" : "A → Z"
+                          }`
                         : "Sort A → Z"}
                     </TooltipContent>
                   </Tooltip>
 
                   <th className="px-6 py-3 text-[16px] font-[400] text-left text-sm font-medium text-gray-700 w-64">
-                    Owner
+                    {ownerColumnConfig.label}
                   </th>
 
                   <Tooltip>
@@ -205,12 +261,36 @@ export default function ListView({
                             }`}
                           >
                             {sortOrder === "asc" ? (
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="#035C4C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M6 2V10M6 2L3 5M6 2L9 5"
+                                  stroke="#035C4C"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
                               </svg>
                             ) : (
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M6 10V2M6 10L3 7M6 10L9 7" stroke="#035C4C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M6 10V2M6 10L3 7M6 10L9 7"
+                                  stroke="#035C4C"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
                               </svg>
                             )}
                           </span>
@@ -219,7 +299,11 @@ export default function ListView({
                     </TooltipTrigger>
                     <TooltipContent>
                       {sortField === "date"
-                        ? `Click to sort ${sortOrder === "asc" ? "Newest → Oldest" : "Oldest → Newest"}`
+                        ? `Click to sort ${
+                            sortOrder === "asc"
+                              ? "Newest → Oldest"
+                              : "Oldest → Newest"
+                          }`
                         : "Sort Oldest → Newest"}
                     </TooltipContent>
                   </Tooltip>
@@ -229,8 +313,20 @@ export default function ListView({
                   </th>
 
                   <th className="px-6 py-3 text-center w-12">
-                    <svg width="19" height="17" viewBox="0 0 19 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M1 12L4.66667 15.6667M4.66667 15.6667L8.33333 12M4.66667 15.6667V1M17.5 4.66667L13.8333 1M13.8333 1L10.1667 4.66667M13.8333 1V15.6667" stroke="#434343" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <svg
+                      width="19"
+                      height="17"
+                      viewBox="0 0 19 17"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M1 12L4.66667 15.6667M4.66667 15.6667L8.33333 12M4.66667 15.6667V1M17.5 4.66667L13.8333 1M13.8333 1L10.1667 4.66667M13.8333 1V15.6667"
+                        stroke="#434343"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </th>
                 </tr>
@@ -238,21 +334,16 @@ export default function ListView({
 
               <tbody className="divide-y divide-gray-100">
                 {items.map((item, index) => {
-                  const creator = getCreatorInfo(item);
-                  const isSelected =
-                    item.type === "folder"
-                      ? selectedIds.folderIds.includes(item._id)
-                      : selectedIds.fileIds.includes(item._id);
+                  const userInfo = getUserInfo(item);
+                  const isSelected = isItemSelected(item);
 
                   return (
                     <tr
                       key={item._id}
                       className={`transition-colors border-b border-gray-200 ${
-                        isSelected ? "bg-blue-50" : "hover:bg-[#F6FFFD]"
+                        isSelected ? "bg-blue-50 ring-2 ring-blue-200" : "hover:bg-[#F6FFFD]"
                       } cursor-pointer`}
-                      onClick={(e) =>
-                        onSelectItem(e, { id: item._id, type: item.type }, index)
-                      }
+                      onClick={(e) => onSelectItem(e, { id: item._id, type: item.type }, index)}
                       onDoubleClick={() => onItemClick(item)}
                     >
                       {/* Name */}
@@ -261,8 +352,20 @@ export default function ListView({
                           {isFolder(item) ? (
                             <>
                               <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0">
-                                <svg width="22" height="19" viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M18.8008 17.8C19.3312 17.8 19.8399 17.5893 20.215 17.2143C20.5901 16.8392 20.8008 16.3305 20.8008 15.8V5.80005C20.8008 5.26962 20.5901 4.76091 20.215 4.38584C19.8399 4.01076 19.3312 3.80005 18.8008 3.80005H10.9008C10.5663 3.80333 10.2363 3.72266 9.94108 3.56543C9.64584 3.4082 9.39474 3.17942 9.21078 2.90005L8.40078 1.70005C8.21867 1.42352 7.97076 1.19653 7.67928 1.03945C7.3878 0.882363 7.06189 0.800103 6.73078 0.800049H2.80078C2.27035 0.800049 1.76164 1.01076 1.38657 1.38584C1.01149 1.76091 0.800781 2.26962 0.800781 2.80005V15.8C0.800781 16.3305 1.01149 16.8392 1.38657 17.2143C1.76164 17.5893 2.27035 17.8 2.80078 17.8H18.8008Z" stroke="#1E1E1E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                                <svg
+                                  width="22"
+                                  height="19"
+                                  viewBox="0 0 22 19"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M18.8008 17.8C19.3312 17.8 19.8399 17.5893 20.215 17.2143C20.5901 16.8392 20.8008 16.3305 20.8008 15.8V5.80005C20.8008 5.26962 20.5901 4.76091 20.215 4.38584C19.8399 4.01076 19.3312 3.80005 18.8008 3.80005H10.9008C10.5663 3.80333 10.2363 3.72266 9.94108 3.56543C9.64584 3.4082 9.39474 3.17942 9.21078 2.90005L8.40078 1.70005C8.21867 1.42352 7.97076 1.19653 7.67928 1.03945C7.3878 0.882363 7.06189 0.800103 6.73078 0.800049H2.80078C2.27035 0.800049 1.76164 1.01076 1.38657 1.38584C1.01149 1.76091 0.800781 2.26962 0.800781 2.80005V15.8C0.800781 16.3305 1.01149 16.8392 1.38657 17.2143C1.76164 17.5893 2.27035 17.8 2.80078 17.8H18.8008Z"
+                                    stroke="#1E1E1E"
+                                    strokeWidth="1.6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
                                 </svg>
                               </div>
                               <span className="text-[16px] font-medium text-gray-800 truncate">
@@ -271,26 +374,58 @@ export default function ListView({
                             </>
                           ) : (
                             <>
-                              <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10.8008 0.800052H2.80078C2.27035 0.800052 1.76164 1.01077 1.38657 1.38584C1.01149 1.76091 0.800781 2.26962 0.800781 2.80005V18.8001C0.800781 19.3305 1.01149 19.8392 1.38657 20.2143C1.76164 20.5893 2.27035 20.8001 2.80078 20.8001H14.8008C15.3312 20.8001 15.8399 20.5893 16.215 20.2143C16.5901 19.8392 16.8008 19.3305 16.8008 18.8001V6.80005M10.8008 0.800052C11.1173 0.799539 11.4309 0.861654 11.7233 0.982821C12.0158 1.10399 12.2813 1.28181 12.5048 1.50605L16.0928 5.09405C16.3176 5.31756 16.496 5.5834 16.6175 5.87621C16.739 6.16903 16.8013 6.48302 16.8008 6.80005M10.8008 0.800052V5.80005C10.8008 6.06527 10.9061 6.31962 11.0937 6.50716C11.2812 6.69469 11.5356 6.80005 11.8008 6.80005L16.8008 6.80005" stroke="#1E1E1E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                              <svg
+                                width="18"
+                                height="22"
+                                viewBox="0 0 18 22"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M10.8008 0.800052H2.80078C2.27035 0.800052 1.76164 1.01077 1.38657 1.38584C1.01149 1.76091 0.800781 2.26962 0.800781 2.80005V18.8001C0.800781 19.3305 1.01149 19.8392 1.38657 20.2143C1.76164 20.5893 2.27035 20.8001 2.80078 20.8001H14.8008C15.3312 20.8001 15.8399 20.5893 16.215 20.2143C16.5901 19.8392 16.8008 19.3305 16.8008 18.8001V6.80005M10.8008 0.800052C11.1173 0.799539 11.4309 0.861654 11.7233 0.982821C12.0158 1.10399 12.2813 1.28181 12.5048 1.50605L16.0928 5.09405C16.3176 5.31756 16.496 5.5834 16.6175 5.87621C16.739 6.16903 16.8013 6.48302 16.8008 6.80005M10.8008 0.800052V5.80005C10.8008 6.06527 10.9061 6.31962 11.0937 6.50716C11.2812 6.69469 11.5356 6.80005 11.8008 6.80005L16.8008 6.80005"
+                                  stroke="#1E1E1E"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
                               </svg>
                               <span className="text-sm font-medium text-gray-800 truncate">
-                                {item.extension ? `${item.name}.${item.extension}` : item.name}
+                                {item.extension
+                                  ? `${item.name}.${item.extension}`
+                                  : item.name}
                               </span>
                             </>
                           )}
                         </div>
                       </td>
 
-                      {/* Owner */}
+                      {/* Owner / Shared By */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
-                            <span className="text-white text-sm font-medium">
-                              {creator.initials}
-                            </span>
-                          </div>
-                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-3 cursor-pointer">
+                              <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                                <span className="text-white text-sm font-medium">
+                                  {userInfo.initials}
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-800">
+                                  {userInfo.username}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {userInfo.email}
+                                </span>
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-xs">
+                              <p className="font-medium">{userInfo.username}</p>
+                              <p className="text-gray-400">{userInfo.email}</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
                       </td>
 
                       {/* Date modified */}
@@ -305,166 +440,238 @@ export default function ListView({
 
                       {/* Actions */}
                       <td className="px-6 py-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            asChild
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
+                        {item.actions?.canView && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              asChild
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
 
-                          <DropdownMenuContent align="end" className="w-56">
-                            {(canDo(item, 'canMove') || canDo(item, 'canEdit')) && (
-                              <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                  <FolderInput className="w-4 h-4 mr-2" /> Organize
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent>
-                                  {canDo(item, 'canMove') && (
+                            <DropdownMenuContent align="end" className="w-56">
+                              {/* Organize submenu */}
+                              {(item.actions?.canUpload ||
+                                item.actions?.canShare) && (
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <FolderInput className="w-4 h-4 mr-2" />{" "}
+                                    Organize
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuSubContent>
+                                    {item.actions?.canUpload && onMove && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onMove(item);
+                                        }}
+                                      >
+                                        <FolderInput className="w-4 h-4 mr-2" />{" "}
+                                        Move
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    <DropdownMenuItem
+                                      onClick={(e) =>
+                                        handleToggleStarred(item, e)
+                                      }
+                                      disabled={
+                                        addStarred.isPending ||
+                                        removeStarred.isPending
+                                      }
+                                    >
+                                      {item.isStarred ? (
+                                        <>
+                                          <StarOff className="w-4 h-4 mr-2" />{" "}
+                                          Remove from Starred
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Star className="w-4 h-4 mr-2" /> Add
+                                          to Starred
+                                        </>
+                                      )}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                              )}
+
+                              {/* Rename */}
+                              {item.actions?.canUpload && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onRename(item);
+                                  }}
+                                >
+                                  <Pencil className="w-4 h-4 mr-2" /> Rename
+                                </DropdownMenuItem>
+                              )}
+
+                              {/* Folder-specific actions */}
+                              {isFolder(item) && (
+                                <>
+                                  {item.actions?.canDownload && (
                                     <DropdownMenuItem
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        onMove?.(item);
+                                        onDownload(item);
                                       }}
                                     >
-                                      <FolderInput className="w-4 h-4 mr-2" /> Move
+                                      <Download className="w-4 h-4 mr-2" />{" "}
+                                      Download Folder
                                     </DropdownMenuItem>
                                   )}
-                                  
-                                  <DropdownMenuItem
-                                    onClick={(e) => handleToggleStarred(item, e)}
-                                    disabled={addStarred.isPending || removeStarred.isPending}
-                                  >
-                                    {item.starred ? (
-                                      <>
-                                        <StarOff className="w-4 h-4 mr-2" /> Remove from Starred
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Star className="w-4 h-4 mr-2" /> Add to Starred
-                                      </>
-                                    )}
-                                  </DropdownMenuItem>
-                                </DropdownMenuSubContent>
-                              </DropdownMenuSub>
-                            )}
 
-                            {canDo(item, 'canEdit') && (
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRename(item);
-                                }}
-                              >
-                                <Pencil className="w-4 h-4 mr-2" /> Rename
-                              </DropdownMenuItem>
-                            )}
-
-                            {!isFolder(item) && (
-                              <>
-                                {canDo(item, 'canDownload') && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onDownload(item);
-                                    }}
-                                  >
-                                    <Download className="w-4 h-4 mr-2" /> Download
-                                  </DropdownMenuItem>
-                                )}
-
-                                {canDo(item, 'canView') && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onShowInfo(item);
-                                    }}
-                                  >
-                                    <Eye className="w-4 h-4 mr-2" /> View Details
-                                  </DropdownMenuItem>
-                                )}
-
-                                {canDo(item, 'canEdit') && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onAddTags(item);
-                                    }}
-                                  >
-                                    <Tag className="w-4 h-4 mr-2" /> Add Tags
-                                  </DropdownMenuItem>
-                                )}
-
-                                {(canDo(item, 'canShare') || canDo(item, 'canEdit') || canDo(item, 'canView')) && (
-                                  <DropdownMenuSeparator />
-                                )}
-
-                                {canDo(item, 'canShare') && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onShare(item);
-                                    }}
-                                  >
-                                    <Users className="w-4 h-4 mr-2" /> Share 
-                                  </DropdownMenuItem>
-                                )}
-
-                                {(canDo(item, 'canEdit') || canDo(item, 'canUpload')) && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onReupload(item._id);
-                                    }}
-                                  >
-                                    <RefreshCw className="w-4 h-4 mr-2" /> Reupload
-                                  </DropdownMenuItem>
-                                )}
-
-                                {canDo(item, 'canView') && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <Link
-                                      to={`/dashboard/version-history/${item._id}`}
-                                      className="flex items-center w-full"
+                                  {item.actions?.canView && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onShowInfo(item);
+                                      }}
                                     >
-                                      <History className="w-4 h-4 mr-2" /> Version History
-                                    </Link>
-                                  </DropdownMenuItem>
-                                )}
+                                      <Info className="w-4 h-4 mr-2" /> Folder
+                                      Information
+                                    </DropdownMenuItem>
+                                  )}
 
-                                {canDo(item, 'canView') && (
+                                  {item.actions?.canShare && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onShare(item);
+                                        }}
+                                      >
+                                        <Users className="w-4 h-4 mr-2" /> Share
+                                        Folder
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Document-specific actions */}
+                              {!isFolder(item) && (
+                                <>
+                                  {item.actions?.canDownload && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDownload(item);
+                                      }}
+                                    >
+                                      <Download className="w-4 h-4 mr-2" />{" "}
+                                      Download
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {item.actions?.canView && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onShowInfo(item);
+                                      }}
+                                    >
+                                      <Eye className="w-4 h-4 mr-2" /> View
+                                      Details
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {item.actions?.canUpload && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onAddTags(item);
+                                      }}
+                                    >
+                                      <Tag className="w-4 h-4 mr-2" /> Add Tags
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {(item.actions?.canShare ||
+                                    item.actions?.canUpload ||
+                                    item.actions?.canView) && (
+                                    <DropdownMenuSeparator />
+                                  )}
+
+                                  {item.actions?.canShare && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onShare(item);
+                                      }}
+                                    >
+                                      <Users className="w-4 h-4 mr-2" /> Share
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {item.actions?.canUpload && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onReupload(item._id);
+                                      }}
+                                    >
+                                      <RefreshCw className="w-4 h-4 mr-2" />{" "}
+                                      Reupload
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {item.actions?.canView && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Link
+                                          to={`/dashboard/version-history/${item._id}`}
+                                          className="flex items-center w-full"
+                                        >
+                                          <History className="w-4 h-4 mr-2" />{" "}
+                                          Version History
+                                        </Link>
+                                      </DropdownMenuItem>
+
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onShowInfo(item, "activity");
+                                        }}
+                                      >
+                                        <Activity className="w-4 h-4 mr-2" />{" "}
+                                        Activity
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Delete */}
+                              {item.actions?.canDelete && (
+                                <>
+                                  <DropdownMenuSeparator />
                                   <DropdownMenuItem
+                                    className="text-red-600"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      onShowInfo(item , "activity");
+                                      onDelete(item);
                                     }}
                                   >
-                                    <Activity className="w-4 h-4 mr-2" /> Activity
+                                    <Trash2 className="w-4 h-4 mr-2" /> Move to
+                                    Trash
                                   </DropdownMenuItem>
-                                )}
-                              </>
-                            )}
-
-                            {canDo(item, 'canDelete') && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-red-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDelete(item);
-                                  }}
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" /> Move to Trash
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </td>
                     </tr>
                   );

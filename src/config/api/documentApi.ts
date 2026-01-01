@@ -1,532 +1,428 @@
-import httpClient from "../httpClient";
-import {
-  generatePresignedUrlsSchema,
-  createDocumentSchema,
-  documentIdSchema,
-  getDocumentsByParentSchema,
-  getRecentDocumentsSchema,
-  updateDocumentSchema,
-  moveDocumentSchema,
-  searchDocumentsSchema,
-  findByExtensionSchema,
-  createVersionSchema,
-  getAllVersionsSchema,
-  versionNumberSchema,
-  revertToVersionSchema,
-  deleteOldVersionsSchema,
-  tagsSchema,
-  findByTagsSchema,
-} from "@/utils/validations/documentValidation";
+// api/documentApi.ts
+
+import httpClient from '@/config/httpClient';
+import type {
+  IPresignedUrlsResponse,
+  IDocumentResponse,
+  IDocumentListResponse,
+  IVersionResponse,
+  IVersionListResponse,
+  IDownloadUrlResponse,
+  IShareDocumentResponse,
+  IChunkedUploadInitResponse,
+  IChunkUploadResponse,
+  IDocumentStatsResponse,
+  IGeneratePresignedUrlsPayload,
+  ICreateDocumentPayload,
+  IUpdateDocumentPayload,
+  IMoveDocumentPayload,
+  ISearchDocumentsParams,
+  ICreateVersionPayload,
+  IRevertToVersionPayload,
+  ITagsPayload,
+  IShareDocumentPayload,
+  IInitiateChunkedUploadPayload,
+  IUploadChunkPayload,
+  ICompleteChunkedUploadPayload,
+  IAbortChunkedUploadPayload,
+} from '@/config/types/documentTypes';
 
 /* =======================================================
-   DOCUMENT UPLOAD & MANAGEMENT API CALLS
+   UPLOAD & PRESIGNED URLs
    ======================================================= */
 
 /**
- * Generate presigned upload URLs
- * Route: POST /api/documents/generate-upload-urls
- * Access: Private
+ * Generate presigned upload URLs for direct S3 upload
+ * @route POST /api/documents/generate-upload-urls
  */
-export const generatePresignedUrls = async (payload: {
-  files: { filename: string; mimeType: string }[];
-  parent_id: string;
+export async function generatePresignedUrls(
+  payload: IGeneratePresignedUrlsPayload
+): Promise<IPresignedUrlsResponse> {
+  const response = await httpClient.post('/documents/generate-upload-urls', payload);
+  return response.data;
+}
+
+/**
+ * Create a new document after S3 upload
+ * @route POST /api/documents
+ */
+export async function createDocument(
+  payload: ICreateDocumentPayload
+): Promise<IDocumentResponse> {
+  const response = await httpClient.post('/documents', payload);
+  return response.data;
+}
+
+/* =======================================================
+   CHUNKED UPLOAD (Large Files)
+   ======================================================= */
+
+/**
+ * Initiate chunked upload for files >100MB
+ * @route POST /api/documents/chunked/initiate
+ */
+export async function initiateChunkedUpload(
+  payload: IInitiateChunkedUploadPayload
+): Promise<IChunkedUploadInitResponse> {
+  const response = await httpClient.post('/documents/chunked/initiate', payload);
+  return response.data;
+}
+
+/**
+ * Upload a single chunk
+ * @route POST /api/documents/chunked/upload
+ */
+
+
+export const uploadChunk = async ({
+  uploadId,
+  key,
+  partNumber,
+  chunk,
+}: {
+  uploadId: string;
+  key: string;
+  partNumber: number;
+  chunk: Blob;
 }) => {
-  // Validate the payload structure
-  const validated = generatePresignedUrlsSchema.parse(payload);
-  
-  const res = await httpClient.post("/documents/generate-upload-urls", validated);
-  return res.data;
-};
-
-/**
- * Create a new document
- * Route: POST /api/documents
- * Access: Private
- */
-export const createDocument = async (data: {
-  name: string;
-  originalName: string;
-  parent_id: string;
-  fileUrl: string;
-  mimeType: string;
-  extension: string;
-  size: number;
-  description?: string;
-  tags?: string[];
-}) => {
-  const validated = createDocumentSchema.parse(data);
-  const res = await httpClient.post("/documents", validated);
-  return res.data;
-};
-
-/**
- * Get document by ID
- * Route: GET /api/documents/:id
- * Access: Private
- */
-export const getDocumentById = async (id: string) => {
-  const validated = documentIdSchema.parse({ id });
-  const res = await httpClient.get(`/documents/${validated.id}`);
-  return res.data;
-};
-
-/**
- * Get documents under a folder or department
- * Route: GET /api/parents/:parentId/documents
- * Access: Private
- */
-export const getDocumentsByParent = async (
-  parentId: string,
-  includeDeleted = false
-) => {
-  const validated = getDocumentsByParentSchema.parse({ parentId, includeDeleted });
-  const res = await httpClient.get(`/parents/${validated.parentId}/documents`, {
-    params: { includeDeleted: validated.includeDeleted },
+  // Convert Blob to base64
+  const base64Chunk = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      // Remove the data URL prefix (e.g., "data:application/octet-stream;base64,")
+      const base64Data = base64.split(',')[1];
+      resolve(base64Data);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(chunk);
   });
-  return res.data;
-};
 
-/**
- * Get documents for specific folder
- * Route: GET /api/folders/:folderId/documents
- * Access: Private
- */
-export const getDocumentsByFolder = async (folderId: string) => {
-  const validated = documentIdSchema.parse({ id: folderId });
-  const res = await httpClient.get(`/folders/${validated.id}/documents`);
-  return res.data;
-};
-
-/**
- * Get documents for specific department
- * Route: GET /api/departments/:departmentId/documents
- * Access: Private
- */
-export const getDocumentsByDepartment = async (
-  departmentId: string,
-  includeDeleted = false
-) => {
-  const validated = getDocumentsByParentSchema.parse({ 
-    parentId: departmentId, 
-    includeDeleted 
+  return httpClient.post('/documents/chunked/upload', {
+    uploadId,
+    key,
+    partNumber,
+    body: base64Chunk,  // ✅ Correct field name
   });
-  const res = await httpClient.get(`/departments/${validated.parentId}/documents`, {
-    params: { includeDeleted: validated.includeDeleted },
-  });
-  return res.data;
 };
 
 /**
- * Get recent documents under a department
- * Route: GET /api/departments/:departmentId/documents/recent
- * Access: Private
+ * Complete chunked upload
+ * @route POST /api/documents/chunked/complete
  */
-export const getRecentDocuments = async (
-  departmentId: string,
-  limit = 10
-) => {
-  const validated = getRecentDocumentsSchema.parse({ departmentId, limit });
-  const res = await httpClient.get(
-    `/departments/${validated.departmentId}/documents/recent`,
-    { params: { limit: validated.limit } }
-  );
-  return res.data;
-};
+export async function completeChunkedUpload(
+  payload: ICompleteChunkedUploadPayload
+): Promise<IDocumentResponse> {
+  const response = await httpClient.post('/documents/chunked/complete', payload);
+  return response.data;
+}
 
 /**
- * Update document details
- * Route: PUT /api/documents/:id
- * Access: Private
+ * Abort chunked upload
+ * @route POST /api/documents/chunked/abort
  */
-export const updateDocument = async (
+export async function abortChunkedUpload(
+  payload: IAbortChunkedUploadPayload
+): Promise<void> {
+  await httpClient.post('/documents/chunked/abort', payload);
+}
+
+/* =======================================================
+   DOCUMENT READ
+   ======================================================= */
+
+/**
+ * Get document by ID with full details
+ * @route GET /api/documents/:id
+ */
+export async function getDocumentById(id: string): Promise<IDocumentResponse> {
+  const response = await httpClient.get(`/documents/${id}`);
+  return response.data;
+}
+
+/**
+ * Search documents
+ * @route GET /api/documents/search
+ */
+export async function searchDocuments(
+  params: ISearchDocumentsParams
+): Promise<IDocumentListResponse> {
+  const response = await httpClient.get('/documents/search', { params });
+  return response.data;
+}
+
+/* =======================================================
+   DOCUMENT UPDATE
+   ======================================================= */
+
+/**
+ * Update document metadata
+ * @route PUT /api/documents/:id
+ */
+export async function updateDocument(
   id: string,
-  data: { name?: string; description?: string; tags?: string[] }
-) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedData = updateDocumentSchema.parse(data);
-  const res = await httpClient.put(`/documents/${validatedId.id}`, validatedData);
-  return res.data;
-};
+  payload: IUpdateDocumentPayload
+): Promise<IDocumentResponse> {
+  const response = await httpClient.put(`/documents/${id}`, payload);
+  return response.data;
+}
 
 /**
  * Move document to another folder/department
- * Route: POST /api/documents/:id/move
- * Access: Private
+ * @route POST /api/documents/:id/move
  */
-export const moveDocument = async (id: string, newParentId: string) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedData = moveDocumentSchema.parse({ newParentId });
-  const res = await httpClient.post(`/documents/${validatedId.id}/move`, validatedData);
-  return res.data;
-};
+export async function moveDocument(
+  id: string,
+  payload: IMoveDocumentPayload
+): Promise<IDocumentResponse> {
+  const response = await httpClient.post(`/documents/${id}/move`, payload);
+  return response.data;
+}
 
 /**
  * Soft delete a document
- * Route: DELETE /api/documents/:id
- * Access: Private
+ * @route DELETE /api/documents/:id
  */
-export const deleteDocument = async (id: string) => {
-  const validated = documentIdSchema.parse({ id });
-  const res = await httpClient.delete(`/documents/${validated.id}`);
-  return res.data;
-};
+export async function deleteDocument(id: string): Promise<void> {
+  await httpClient.delete(`/documents/${id}`);
+}
 
 /**
  * Restore a deleted document
- * Route: POST /api/documents/:id/restore
- * Access: Private
+ * @route POST /api/documents/:id/restore
  */
-export const restoreDocument = async (id: string) => {
-  const validated = documentIdSchema.parse({ id });
-  const res = await httpClient.post(`/documents/${validated.id}/restore`);
-  return res.data;
-};
-
-/**
- * Search documents by name
- * Route: GET /api/documents/search
- * Access: Private
- */
-export const searchDocuments = async (
-  query: string,
-  departmentId?: string,
-  limit = 20
-) => {
-  const validated = searchDocumentsSchema.parse({ 
-    q: query, 
-    departmentId, 
-    limit 
-  });
-  const res = await httpClient.get("/documents/search", {
-    params: validated,
-  });
-  return res.data;
-};
-
-/**
- * Generate presigned download URL
- * Route: GET /api/documents/:id/download
- * Access: Private
- */
-export const generateDownloadUrl = async (id: string) => {
-  const res = await httpClient.get(`/documents/${id}/download`);
-  return res.data;
-};
-
-
-
-/* =======================================================
-   VERSION MANAGEMENT
-   ======================================================= */
-
-/**
- * Create a new version of a document
- * Route: POST /api/documents/:id/versions
- * Access: Private
- */
-export const createVersion = async (
-  id: string,
-  data: {
-    fileUrl: string;
-    size: number;
-    mimeType: string;
-    extension: string;
-    name: string;
-    originalName: string;
-    changeDescription?: string;
-    fileHash?: string;
-  }
-) => {
-  const validatedId = documentIdSchema.parse({ id });
-
- 
-  const validatedData = createVersionSchema.parse(data);
-  const res = await httpClient.post(
-    `/documents/${validatedId.id}/versions`,
-    validatedData
-  );
-  return res.data;
-};
-
-/**
- * Get all versions of a document
- * Route: GET /api/documents/:id/versions
- * Access: Private
- */
-export const getAllVersions = async (
-  id: string,
-  options?: {
-    sort?: "asc" | "desc";
-    limit?: number;
-    populate?: boolean;
-  }
-) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedOptions = getAllVersionsSchema.parse(options || {});
-  const res = await httpClient.get(`/documents/${validatedId.id}/versions`, {
-    params: validatedOptions,
-  });
-  return res.data;
-};
-
-/**
- * Get latest version of a document
- * Route: GET /api/documents/:id/versions/latest
- * Access: Private
- */
-export const getLatestVersion = async (id: string) => {
-  const validated = documentIdSchema.parse({ id });
-  const res = await httpClient.get(`/documents/${validated.id}/versions/latest`);
-  return res.data;
-};
-
-/**
- * Get a specific version by version number
- * Route: GET /api/documents/:id/versions/:versionNumber
- * Access: Private
- */
-export const getVersionByNumber = async (id: string, versionNumber: number) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedVersion = versionNumberSchema.parse({ versionNumber });
-  const res = await httpClient.get(
-    `/documents/${validatedId.id}/versions/${validatedVersion.versionNumber}`
-  );
-  return res.data;
-};
-
-/**
- * Revert document to a specific version
- * Route: POST /api/documents/:id/versions/revert
- * Access: Private
- */
-export const revertToVersion = async (id: string, versionNumber: number) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedData = revertToVersionSchema.parse({ versionNumber });
-  const res = await httpClient.post(
-    `/documents/${validatedId.id}/versions/revert`,
-    validatedData
-  );
-  return res.data;
-};
-
-/**
- * Get version comparison/difference
- * Route: GET /api/documents/:id/versions/:versionNumber/diff
- * Access: Private
- */
-export const getVersionDiff = async (id: string, versionNumber: number) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedVersion = versionNumberSchema.parse({ versionNumber });
-  const res = await httpClient.get(
-    `/documents/${validatedId.id}/versions/${validatedVersion.versionNumber}/diff`
-  );
-  return res.data;
-};
-
-/**
- * Delete old versions (keep only N most recent)
- * Route: DELETE /api/documents/:id/versions/cleanup
- * Access: Private
- */
-export const deleteOldVersions = async (id: string, keepCount = 5) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedData = deleteOldVersionsSchema.parse({ keepCount });
-  const res = await httpClient.delete(`/documents/${validatedId.id}/versions/cleanup`, {
-    data: validatedData,
-  });
-  return res.data;
-};
-
-/**
- * Delete a specific version
- * Route: DELETE /api/documents/:id/versions/:versionNumber
- * Access: Private
- */
-export const deleteVersion = async (id: string, versionNumber: number) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedVersion = versionNumberSchema.parse({ versionNumber });
-  const res = await httpClient.delete(
-    `/documents/${validatedId.id}/versions/${validatedVersion.versionNumber}`
-  );
-  return res.data;
-};
+export async function restoreDocument(id: string): Promise<IDocumentResponse> {
+  const response = await httpClient.post(`/documents/${id}/restore`);
+  return response.data;
+}
 
 /* =======================================================
    TAG MANAGEMENT
    ======================================================= */
 
 /**
- * Add tags to a document
- * Route: POST /api/documents/:id/tags
- * Access: Private
+ * Add tags to document
+ * @route POST /api/documents/:id/tags
  */
-export const addTags = async (id: string, tags: string[]) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedData = tagsSchema.parse({ tags });
-  const res = await httpClient.post(`/documents/${validatedId.id}/tags`, validatedData);
-  return res.data;
-};
+export async function addTags(
+  id: string,
+  payload: ITagsPayload
+): Promise<IDocumentResponse> {
+  const response = await httpClient.post(`/documents/${id}/tags`, payload);
+  return response.data;
+}
 
 /**
- * Remove tags from a document
- * Route: DELETE /api/documents/:id/tags
- * Access: Private
+ * Remove tags from document
+ * @route DELETE /api/documents/:id/tags
  */
-export const removeTags = async (id: string, tags: string[]) => {
-  const validatedId = documentIdSchema.parse({ id });
-  const validatedData = tagsSchema.parse({ tags });
-  const res = await httpClient.delete(`/documents/${validatedId.id}/tags`, {
-    data: validatedData,
-  });
-  return res.data;
-};
-
-/**
- * Find documents by tags
- * Route: GET /api/documents/tags
- * Access: Private
- */
-export const findByTags = async (tags: string[]) => {
-  const validated = findByTagsSchema.parse({ tags });
-  const res = await httpClient.get("/documents/tags", {
-    params: { tags: validated.tags.join(",") },
-  });
-  return res.data;
-};
-
-/**
- * Find documents by file extension
- * Route: GET /api/documents/extension/:ext
- * Access: Private
- */
-export const findByExtension = async (ext: string) => {
-  const validated = findByExtensionSchema.parse({ ext });
-  const res = await httpClient.get(`/documents/extension/${validated.ext}`);
-  return res.data;
-};
+export async function removeTags(
+  id: string,
+  payload: ITagsPayload
+): Promise<IDocumentResponse> {
+  const response = await httpClient.delete(`/documents/${id}/tags`, { data: payload });
+  return response.data;
+}
 
 /* =======================================================
-   STATS
+   DOWNLOAD
    ======================================================= */
 
 /**
- * Get department-wise document stats
- * Route: GET /api/departments/:departmentId/stats
- * Access: Private
+ * Generate download URL for document
+ * @route GET /api/documents/:id/download
  */
-export const getDepartmentStats = async (departmentId: string) => {
-  const validated = documentIdSchema.parse({ id: departmentId });
-  const res = await httpClient.get(`/departments/${validated.id}/stats`);
-  return res.data;
-};
+export async function generateDownloadUrl(id: string): Promise<IDownloadUrlResponse> {
+  const response = await httpClient.get(`/documents/${id}/download`);
+  return response.data;
+}
 
 /* =======================================================
-   TYPE DEFINITIONS
+   VERSION MANAGEMENT
    ======================================================= */
 
-export interface Document {
-  _id: string;
-  name: string;
-  originalName: string;
-  displayName: string;
-  parent_id: string;
-  fileUrl: string;
-  mimeType: string;
-  extension: string;
-  size: number;
-  sizeFormatted: string;
-  description?: string;
-  tags: string[];
-  path: string;
-  isDeleted: boolean;
-  deletedAt?: Date;
-  deletedBy?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string;
-  fileCategory: string;
+/**
+ * Create new version (re-upload)
+ * @route POST /api/documents/:id/versions
+ */
+export async function createVersion(
+  id: string,
+  payload: ICreateVersionPayload
+): Promise<IVersionResponse> {
+  const response = await httpClient.post(`/documents/${id}/versions`, payload);
+  return response.data;
 }
 
-export interface DocumentVersion {
-  _id: string;
-  documentId: string;
-  versionNumber: number;
-  name: string;
-  originalName: string;
-  displayName: string;
-  fileUrl: string;
-  size: number;
-  sizeFormatted: string;
-  mimeType: string;
-  extension: string;
-  isLatest: boolean;
-  changeDescription?: string;
-  pathAtCreation?: string;
-  fileHash?: string;
-  createdBy: string;
-  createdAt: Date;
-  createdAgo: string;
-  fileCategory: string;
+/**
+ * Get all versions
+ * @route GET /api/documents/:id/versions
+ */
+export async function getAllVersions(id: string): Promise<IVersionListResponse> {
+  const response = await httpClient.get(`/documents/${id}/versions`);
+  return response.data;
 }
 
-export interface VersionDiff {
-  version: DocumentVersion;
-  sizeDifference: {
-    bytes: number;
-    formatted: string;
-    percentage: number;
-  };
-  previousVersion: DocumentVersion | null;
-  nextVersion: DocumentVersion | null;
+/**
+ * Get specific version by number or ObjectId
+ * @route GET /api/documents/:id/versions/:versionNumber
+ */
+export async function getVersionByNumber(
+  id: string,
+  versionNumber: number | string
+): Promise<IVersionResponse> {
+  const response = await httpClient.get(`/documents/${id}/versions/${versionNumber}`);
+  return response.data;
 }
 
-export interface DocumentStats {
-  totalDocuments: number;
-  totalSize: number;
-  totalSizeFormatted: string;
-  documentsByExtension: Record<string, number>;
-  documentsByCategory: Record<string, number>;
+/**
+ * Generate download URL for specific version
+ * @route GET /api/documents/:id/versions/:versionNumber/download
+ */
+export async function generateVersionDownloadUrl(
+  id: string,
+  versionNumber: number | string
+): Promise<IDownloadUrlResponse> {
+  const response = await httpClient.get(
+    `/documents/${id}/versions/${versionNumber}/download`
+  );
+  return response.data;
 }
 
-export interface DocumentListResponse {
-  success: boolean;
-  count: number;
-  data: Document[];
+/**
+ * Revert to specific version
+ * @route POST /api/documents/:id/versions/revert
+ */
+export async function revertToVersion(
+  id: string,
+  payload: IRevertToVersionPayload
+): Promise<IVersionResponse> {
+  const response = await httpClient.post(`/documents/${id}/versions/revert`, payload);
+  return response.data;
 }
 
-export interface DocumentResponse {
-  success: boolean;
-  message?: string;
-  data: Document;
+/* =======================================================
+   SHARING
+   ======================================================= */
+
+/**
+ * Share document with users/groups
+ * @route POST /api/documents/:id/share
+ */
+export async function shareDocument(
+  id: string,
+  payload: IShareDocumentPayload
+): Promise<IShareDocumentResponse> {
+  const response = await httpClient.post(`/documents/${id}/share`, payload);
+  return response.data;
 }
 
-export interface VersionListResponse {
-  success: boolean;
-  count: number;
-  data: DocumentVersion[];
+/* =======================================================
+   STATISTICS
+   ======================================================= */
+
+/**
+ * Get department document statistics
+ * @route GET /api/departments/:departmentId/stats
+ */
+export async function getDepartmentStats(
+  departmentId: string
+): Promise<IDocumentStatsResponse> {
+  const response = await httpClient.get(`/departments/${departmentId}/stats`);
+  return response.data;
 }
 
-export interface VersionResponse {
-  success: boolean;
-  message?: string;
-  data: DocumentVersion;
+/* =======================================================
+   UTILITY FUNCTIONS
+   ======================================================= */
+
+/**
+ * Helper: Upload file with progress tracking
+ */
+export async function uploadFileWithProgress(
+  file: File,
+  parentId: string,
+  onProgress?: (progress: number) => void
+): Promise<IDocumentResponse> {
+  // 1. Generate presigned URL
+  const { data: presignedData } = await generatePresignedUrls({
+    files: [
+      {
+        filename: file.name,
+        mimeType: file.type,
+      },
+    ],
+    parentId,
+  });
+
+  const { url, key, filename } = presignedData[0];
+
+  // 2. Upload to S3 with progress
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const progress = (e.loaded / e.total) * 100;
+          onProgress(progress);
+        }
+      });
+    }
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`Upload failed with status ${xhr.status}`));
+      }
+    });
+
+    xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+    xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.send(file);
+  });
+
+  // 3. Create document record
+  const extension = file.name.split('.').pop() || '';
+  return await createDocument({
+    name: file.name,
+    originalName: file.name,
+    parentId,
+    fileUrl: key,
+    mimeType: file.type,
+    extension,
+    size: file.size,
+  });
 }
 
-export interface VersionDiffResponse {
-  success: boolean;
-  data: VersionDiff;
+/**
+ * Helper: Download file
+ */
+export async function downloadFile(id: string): Promise<void> {
+  const { data } = await generateDownloadUrl(id);
+  const link = document.createElement('a');
+  link.href = data.url;
+  link.download = data.filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
-export interface DocumentStatsResponse {
-  success: boolean;
-  data: DocumentStats;
-}
-
-export interface PresignedUrlResponse {
-  success: boolean;
-  data: {
-    uploadUrl: string;
-    fileUrl: string;
-    filename: string;
-  }[];
+/**
+ * Helper: Download specific version
+ */
+export async function downloadVersion(
+  id: string,
+  versionNumber: number | string
+): Promise<void> {
+  const { data } = await generateVersionDownloadUrl(id, versionNumber);
+  const link = document.createElement('a');
+  link.href = data.url;
+  link.download = data.filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }

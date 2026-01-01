@@ -1,30 +1,15 @@
-
 import { useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  uploadFiles as uploadFilesHelper,
-  validateFiles,
-  ALLOWED_EXTENSIONS,
-} from "@/utils/helper/fileUploadHelper";
-import { validateFile } from "@/utils/helper/fileReuploadHelper";
+
+import { validateFiles, validateFileType } from "@/utils/helper/fileValidationHelpers";
+import { uploadFiles as uploadFilesHelper } from "@/utils/helper/fileUploadHelper";
 import { uploadFolder as uploadFolderHelper } from "@/utils/helper/folderUploadHelper";
 import { useDocumentMutations } from "@/hooks/mutations/useDocumentMutations";
 
 const getFormattedDateTime = () => {
   const now = new Date();
-  const formattedDate = now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  const formattedTime = now.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return `${formattedDate} at ${formattedTime}`;
+  return `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
 };
 
 export const useUploadHandlers = (
@@ -33,6 +18,7 @@ export const useUploadHandlers = (
   setReuploadDocumentId: (id: string | null) => void
 ) => {
   const queryClient = useQueryClient();
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reuploadInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -44,127 +30,103 @@ export const useUploadHandlers = (
     setReuploadDocumentId
   );
 
+  // ===============================
+  // FILE UPLOAD
+  // ===============================
   const handleFileUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0 || !parentId) return;
+    if (!files || !parentId) return;
 
-    const filesArray = Array.from(files);
-    const { validFiles, errors } = validateFiles(filesArray);
+    const { validFiles, errors } = validateFiles(Array.from(files));
 
-    if (errors.length > 0) {
-      toast.warning("Some files were rejected", {
-        description: errors.join(", "),
-      });
-    }
-
-    if (validFiles.length === 0) {
-      toast.error("No valid files to upload", {
-        description: "Please check file types and sizes",
-      });
-      return;
-    }
-
-    try {
-      await uploadFilesHelper(validFiles, {
-        parentId,
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["children", parentId] });
-          queryClient.invalidateQueries({ queryKey: ["tree"] });
-          toast.success(`${validFiles.length} file(s) uploaded successfully`, {
-            description: getFormattedDateTime(),
-          });
-        },
-        onError: (error) => {
-          console.error("Upload error:", error);
-          toast.error("Upload failed", {
-            description: error?.message || getFormattedDateTime(),
-          });
-        },
-      });
-    } catch (error: any) {
-      console.error("Upload failed:", error);
-      toast.error("Upload failed", {
-        description: error?.message || getFormattedDateTime(),
-      });
-    }
-  };
-
-  const handleFolderUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0 || !parentId) return;
-
-    const filesArray = Array.from(files);
-    const { validFiles, errors } = validateFiles(filesArray);
-
-    if (errors.length > 0) {
+    if (errors.length) {
       toast.warning("Some files were rejected", {
         description: errors.slice(0, 3).join(", "),
       });
     }
 
-    if (validFiles.length === 0) {
-      toast.error("No valid files in folder", {
-        description: "All files were rejected",
-      });
+    if (!validFiles.length) {
+      toast.error("No valid files to upload");
       return;
     }
 
-    try {
-      await uploadFolderHelper(validFiles, {
-        parentId,
-        onProgress: (progress) => {
-          console.log(`${progress.stage}: ${progress.current}/${progress.total}`);
-        },
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["children", parentId] });
-          queryClient.invalidateQueries({ queryKey: ["tree"] });
-          toast.success("Folder uploaded successfully", {
-            description: getFormattedDateTime(),
-          });
-        },
-      });
-    } catch (error: any) {
-      console.error("Folder upload failed:", error);
-      toast.error("Folder upload failed", {
-        description: error?.message || getFormattedDateTime(),
-      });
-    }
+    await uploadFilesHelper(validFiles, {
+      parentId,
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["children", parentId] });
+        queryClient.invalidateQueries({ queryKey: ["tree"] });
+        toast.success("Files uploaded successfully", {
+          description: getFormattedDateTime(),
+        });
+      },
+    });
   };
 
+  // ===============================
+  // FOLDER UPLOAD
+  // ===============================
+  const handleFolderUpload = async (files: FileList | null) => {
+    if (!files || !parentId) return;
+
+    const { validFiles, errors } = validateFiles(Array.from(files));
+
+    if (errors.length) {
+      toast.warning("Some files were rejected", {
+        description: errors.slice(0, 3).join(", "),
+      });
+    }
+
+    if (!validFiles.length) {
+      toast.error("No valid files in folder");
+      return;
+    }
+
+    await uploadFolderHelper(validFiles, {
+      parentId,
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["children", parentId] });
+        queryClient.invalidateQueries({ queryKey: ["tree"] });
+        toast.success("Folder uploaded successfully", {
+          description: getFormattedDateTime(),
+        });
+      },
+    });
+  };
+
+  // ===============================
+  // REUPLOAD
+  // ===============================
   const handleReupload = (documentId: string) => {
     setReuploadDocumentId(documentId);
     reuploadInputRef.current?.click();
   };
 
-
   const handleReuploadFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
-    const currentDocId = reuploadDocumentId;
     e.target.value = "";
 
-    if (!file || !currentDocId) return;
+    if (!file || !reuploadDocumentId) return;
 
-    const validation = validateFile(file);
+    const ext = file.name.split(".").pop() || "";
+    const validation = validateFileType(ext, file.type);
+
     if (!validation.valid) {
-      toast.error(validation.error || "Invalid file", {
-        description: getFormattedDateTime(),
-      });
+      toast.error(validation.error || "Invalid file");
       setReuploadDocumentId(null);
       return;
     }
 
-    const loadingToast = toast.loading("Reuploading file...", {
-      description: getFormattedDateTime(),
-    });
+    const loading = toast.loading("Reuploading file...");
 
     try {
       await reuploadMutation.mutateAsync({
         file,
-        documentId: currentDocId,
+        documentId: reuploadDocumentId,
       });
-      toast.dismiss(loadingToast);
-    } catch (error) {
-      toast.dismiss(loadingToast);
+      toast.dismiss(loading);
+    } catch {
+      toast.dismiss(loading);
     }
   };
 
@@ -176,6 +138,5 @@ export const useUploadHandlers = (
     handleFolderUpload,
     handleReupload,
     handleReuploadFileChange,
-    ALLOWED_EXTENSIONS,
   };
 };

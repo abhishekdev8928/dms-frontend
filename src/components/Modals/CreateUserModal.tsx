@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Check, ChevronsUpDown, X, User, Shield, FolderOpen, Building2, Crown, Loader2 } from 'lucide-react';
+import { ArrowRight, Check, ChevronsUpDown, X, User, Shield, Building2, Crown, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -27,139 +27,63 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useAppConfigStore } from '@/config/store/useAppConfigStore'
-import httpClient from '@/config/httpClient';
-import { toast } from 'sonner';
+import { useAppConfigStore } from '@/config/store/useAppConfigStore';
+import { useDepartments } from '@/hooks/queries/useDepartmentQueries';
+import { useCreateUser } from '@/hooks/mutations/useUserManagementMutation';
+import type { UserRole } from '@/config/types/commonTypes';
+import type { Department } from '@/config/types/userManagementTypes';
 
 interface CreateUserModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-
-type UserRole = "super_admin" | "admin" | "department_owner" | "member_bank" | "general_user";
-
-interface Department {
-  _id: string;
-  name: string;
-}
-
-interface Folder {
-  _id: string;
-  name: string;
-  department?: {
-    _id: string;
-    name: string;
-  };
-}
-
-const roleInfo = {
-  general_user: {
-  label: 'General User',
-  description: 'Basic access with ACL-based permissions',
-  icon: User,
-},
-  member_bank: {
-    label: 'Member Bank User',
-    description: 'Access to specific assigned folders only',
-    icon: FolderOpen,
+// Role information mapping
+const roleInfo: Record<UserRole, { label: string; description: string; icon: any }> = {
+  USER: {
+    label: 'User',
+    description: 'Basic access with ACL-based permissions',
+    icon: User,
   },
-  department_owner: {
+  DEPARTMENT_OWNER: {
     label: 'Department Owner',
     description: 'Manages a single department',
     icon: Building2,
   },
-  admin: {
+  ADMIN: {
     label: 'Admin',
     description: 'Manages multiple departments',
     icon: Shield,
   },
-  super_admin: {
+  SUPER_ADMIN: {
     label: 'Super Admin',
     description: 'Full system access to everything',
     icon: Crown,
-  }
-};
-
-// API functions
-const getAllDepartments = async () => {
-  const res = await httpClient.get('/departments', {
-    params: { activeOnly: true }
-  });
-  return res.data.data || [];
-};
-
-const getTopLevelFolders = async () => {
-  const res = await httpClient.get('/folders/top-level');
-  return res.data.data || [];
-};
-
-const createUser = async (userData: any) => {
-  const res = await httpClient.post('auth/users', userData);
-  return res.data;
+  },
 };
 
 export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [openDeptCombo, setOpenDeptCombo] = useState(false);
-  const [openFolderCombo, setOpenFolderCombo] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     role: '' as UserRole | '',
     departments: [] as string[],
     department: '',
-    bankFolders: [] as string[],
   });
 
   const { userList, addUser } = useAppConfigStore();
 
-  // Fetch departments
-  const { data: departments = [], isLoading: loadingDepartments } = useQuery<Department[]>({
-    queryKey: ['departments'],
-    queryFn: getAllDepartments,
-    enabled: open,
-  });
-
-  // Fetch folders
-  const { data: folders = [], isLoading: loadingFolders } = useQuery<Folder[]>({
-    queryKey: ['folders'],
-    queryFn: getTopLevelFolders,
-    enabled: open,
-  });
+  // Fetch departments using the common hook
+  const { data: departmentsData, isLoading: loadingDepartments } = useDepartments(
+    { activeOnly: true },
+    { enabled: open }
+  );
+  const departments = departmentsData?.data || [];
 
   // Create user mutation
-  const createUserMutation = useMutation({
-    mutationFn: createUser,
-    onSuccess: (data) => {
-      toast.success('User created successfully! Welcome email sent.');
-      
-      // Add user to store
-      addUser({
-        id: data.data.userId,
-        username: data.data.username,
-        email: data.data.email,
-        profilePic: ''
-      });
-
-      // Reset form
-      setFormData({
-        username: '',
-        email: '',
-        role: '',
-        departments: [],
-        department: '',
-        bankFolders: [],
-      });
-      setCurrentStep(1);
-      onOpenChange(false);
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to create user';
-      toast.error(message);
-    },
-  });
+  const createUserMutation = useCreateUser();
 
   const steps = [
     { number: 1, title: 'User Details' },
@@ -185,15 +109,34 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
     };
 
     // Add role-specific fields
-    if (formData.role === 'admin') {
+    if (formData.role === 'ADMIN' && formData.departments.length > 0) {
       payload.departments = formData.departments;
-    } else if (formData.role === 'department_owner') {
-      payload.department = formData.department;
-    } else if (formData.role === 'member_bank') {
-      payload.bankFolders = formData.bankFolders;
+    } else if (formData.role === 'DEPARTMENT_OWNER' && formData.department) {
+      payload.departments = [formData.department];
     }
 
-    createUserMutation.mutate(payload);
+    createUserMutation.mutate(payload, {
+      onSuccess: (data) => {
+        // Add user to store
+        addUser({
+          id: data.data.userId,
+          username: data.data.username,
+          email: data.data.email,
+          profilePic: ''
+        });
+
+        // Reset form
+        setFormData({
+          username: '',
+          email: '',
+          role: '',
+          departments: [],
+          department: '',
+        });
+        setCurrentStep(1);
+        onOpenChange(false);
+      },
+    });
   };
 
   const canProceed = () => {
@@ -208,10 +151,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
         user => user.email.toLowerCase() === formData.email.toLowerCase()
       );
 
-      if (usernameExists) {
-        return false;
-      }
-      if (emailExists) {
+      if (usernameExists || emailExists) {
         return false;
       }
 
@@ -220,9 +160,8 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
     
     if (currentStep === 2) {
       if (!formData.role) return false;
-      if (formData.role === 'admin') return formData.departments.length > 0;
-      if (formData.role === 'department_owner') return !!formData.department;
-      if (formData.role === 'member_bank') return formData.bankFolders.length > 0;
+      if (formData.role === 'ADMIN') return formData.departments.length > 0;
+      if (formData.role === 'DEPARTMENT_OWNER') return !!formData.department;
       return true;
     }
     return false;
@@ -249,15 +188,6 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
       departments: prev.departments.includes(deptId)
         ? prev.departments.filter(id => id !== deptId)
         : [...prev.departments, deptId]
-    }));
-  };
-
-  const toggleFolder = (folderId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      bankFolders: prev.bankFolders.includes(folderId)
-        ? prev.bankFolders.filter(id => id !== folderId)
-        : [...prev.bankFolders, folderId]
     }));
   };
 
@@ -369,7 +299,6 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
                     role: value as UserRole,
                     departments: [],
                     department: '',
-                    bankFolders: []
                   }))}
                 >
                   <SelectTrigger id="role" className="mt-1.5 h-10 bg-white">
@@ -402,7 +331,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
               </div>
 
               {/* Admin - Multiple Departments */}
-              {formData.role === 'admin' && (
+              {formData.role === 'ADMIN' && (
                 <div>
                   <Label className="text-sm font-medium text-gray-700">
                     Assign Departments
@@ -411,7 +340,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
                   {formData.departments.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
                       {formData.departments.map((deptId) => {
-                        const dept = departments.find(d => d._id === deptId);
+                        const dept = departments.find((d: Department) => d._id === deptId);
                         return (
                           <div
                             key={deptId}
@@ -451,7 +380,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
                         <CommandInput placeholder="Search..." className="h-9" />
                         <CommandEmpty>No department found.</CommandEmpty>
                         <CommandGroup className="max-h-48 overflow-auto">
-                          {departments.map((dept) => (
+                          {departments.map((dept: Department) => (
                             <CommandItem
                               key={dept._id}
                               value={dept.name}
@@ -476,7 +405,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
               )}
 
               {/* Department Owner - Single Department */}
-              {formData.role === 'department_owner' && (
+              {formData.role === 'DEPARTMENT_OWNER' && (
                 <div>
                   <Label htmlFor="department" className="text-sm font-medium text-gray-700">
                     Select Department
@@ -490,7 +419,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
                       <SelectValue placeholder={loadingDepartments ? "Loading..." : "Choose a department"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {departments.map((dept) => (
+                      {departments.map((dept: Department) => (
                         <SelectItem key={dept._id} value={dept._id}>
                           {dept.name}
                         </SelectItem>
@@ -500,95 +429,21 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
                 </div>
               )}
 
-              {/* Member Bank - Multiple Folders */}
-              {formData.role === 'member_bank' && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">
-                    Assign Folders
-                  </Label>
-                  
-                  {formData.bankFolders.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
-                      {formData.bankFolders.map((folderId) => {
-                        const folder = folders.find(f => f._id === folderId);
-                        return (
-                          <div
-                            key={folderId}
-                            className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium"
-                          >
-                            <span>{folder?.name}</span>
-                            <button
-                              onClick={() => toggleFolder(folderId)}
-                              className="hover:bg-blue-200 rounded p-0.5"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <Popover open={openFolderCombo} onOpenChange={setOpenFolderCombo}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between h-10 text-sm font-normal mt-1.5 bg-white"
-                        disabled={loadingFolders}
-                      >
-                        <span className="text-gray-500">
-                          {loadingFolders ? 'Loading...' :
-                           formData.bankFolders.length > 0
-                            ? `${formData.bankFolders.length} selected`
-                            : "Select folders"}
-                        </span>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search..." className="h-9" />
-                        <CommandEmpty>No folder found.</CommandEmpty>
-                        <CommandGroup className="max-h-48 overflow-auto">
-                          {folders.map((folder) => (
-                            <CommandItem
-                              key={folder._id}
-                              value={folder.name}
-                              onSelect={() => toggleFolder(folder._id)}
-                              className="py-2"
-                            >
-                              <Checkbox
-                                checked={formData.bankFolders.includes(folder._id)}
-                                className="mr-2"
-                              />
-                              <span className="flex-1">{folder.name}</span>
-                              {formData.bankFolders.includes(folder._id) && (
-                                <Check className="h-4 w-4 text-blue-600" />
-                              )}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
-
               {/* User & Super Admin Info */}
-              {(formData.role === 'general_user' || formData.role === 'super_admin') && (
+              {(formData.role === 'USER' || formData.role === 'SUPER_ADMIN') && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
                   <div className="flex gap-2.5">
-                    {formData.role === 'general_user' ? (
+                    {formData.role === 'USER' ? (
                       <User className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                     ) : (
                       <Crown className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                     )}
                     <div>
                       <p className="text-sm font-medium text-blue-900">
-                        {formData.role === 'general_user' ? 'ACL-Based Permissions' : 'Full System Access'}
+                        {formData.role === 'USER' ? 'ACL-Based Permissions' : 'Full System Access'}
                       </p>
                       <p className="text-xs text-blue-700 mt-0.5">
-                        {formData.role === 'general_user' 
+                        {formData.role === 'USER' 
                           ? 'This user will have basic access controlled by ACL permissions.'
                           : 'This user will have complete access to all features and data.'}
                       </p>

@@ -1,45 +1,61 @@
 import httpClient from '../httpClient';
 
+/* =======================================================
+   STARRED API
+   ======================================================= */
+
 /**
  * Add starred status to a single item
- * @param {Object} params - { id: string, type: "folder" | "file" }
+ * @param {Object} params - { id: string, type: "folder" | "document" }
  * @returns {Promise<Object>} Response data
  */
-export const addStarredItem = async ({ id, type }: { id: string; type: "folder" | "file" }) => {
-  const { data } = await httpClient.post(`/starred/add`, { id, type });
-  return data;
+export const addStarredItem = async ({ 
+  id, 
+  type 
+}: { 
+  id: string; 
+  type: "folder" | "document";
+}) => {
+  const res = await httpClient.post("/starred/add", { id, type });
+  return res.data;
 };
 
 /**
  * Remove starred status from a single item
- * @param {Object} params - { id: string, type: "folder" | "file" }
+ * @param {Object} params - { id: string, type: "folder" | "document" }
  * @returns {Promise<Object>} Response data
  */
-export const removeStarredItem = async ({ id, type }: { id: string; type: "folder" | "file" }) => {
-  const { data } = await httpClient.post(`/starred/remove`, { id, type });
-  return data;
+export const removeStarredItem = async ({ 
+  id, 
+  type 
+}: { 
+  id: string; 
+  type: "folder" | "document";
+}) => {
+  const res = await httpClient.post("/starred/remove", { id, type });
+  return res.data;
 };
 
 /**
  * Bulk update starred status for multiple items
- * @param {Object} params - { fileIds: string[], folderIds: string[], starred: boolean }
+ * @param {Object} params - { documentIds?: string[], folderIds?: string[], starred: boolean }
  * @returns {Promise<Object>} Response data
  */
 export const bulkUpdateStarred = async ({ 
-  fileIds, 
-  folderIds, 
+  documentIds = [], 
+  folderIds = [], 
   starred 
 }: { 
-  fileIds: string[]; 
-  folderIds: string[]; 
+  documentIds?: string[]; 
+  folderIds?: string[]; 
   starred: boolean;
 }) => {
-  const { data } = await httpClient.post(`/starred/bulk`, { 
-    fileIds, 
+  const res = await httpClient.post("/starred/bulk", { 
+    documentIds,
     folderIds, 
     starred 
   });
-  return data;
+  return res.data;
 };
 
 /**
@@ -47,7 +63,6 @@ export const bulkUpdateStarred = async ({
  * @returns {Promise<Object>} Response data with starred items
  */
 export const getStarredItems = async () => {
-  const { data } = await httpClient.get("/starred");
-  console.log("Starred items fetched:", data);
-  return data;
+  const res = await httpClient.get("/starred");
+  return res.data;
 };

@@ -16,6 +16,7 @@ import NotFoundPage from "@/pages/Common/NotFoundPage";
 import ForgetPasswordPage from "@/pages/Auth/ForgotPasswordPage";
 import StarredPage from "@/pages/Dashboard/StarredPage";
 import UnauthorizedPage from "@/components/common/UnauthorizedPage";
+import SharedPage from "@/pages/Dashboard/SharedPage";
 
 export const router = createBrowserRouter([
   {
@@ -39,6 +40,11 @@ export const router = createBrowserRouter([
         element: <Navigate to="/dashboard/home" replace />,
       },
       {
+        path:"shared-with-me",
+        element:<SharedPage />
+
+      },
+      {
         path: "home",
         element: <HomePage />,
       },
@@ -50,7 +56,12 @@ export const router = createBrowserRouter([
         path: "department",
         element: (
           
+            <ProtectedRoute allowedRoles={["SUPER_ADMIN","DEPARMENT_OWNER","ADMIN"]}>
+
             <DepartmentPage />
+            
+            
+            </ProtectedRoute>
           
         ),
       },

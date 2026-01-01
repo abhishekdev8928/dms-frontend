@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Copy, Mail, ChevronDown, Loader2 } from "lucide-react";
+import { Copy, ChevronDown, Loader2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,49 +7,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAppConfigStore } from "@/config/store/useAppConfigStore";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { toast } from "sonner";
-import type { FileItem } from "@/types/documentTypes";
-import * as ACLApi from "@/config/api/accessControlListApi"; // Import the ACL API
 
-type Visibility = "public" | "private" | "restricted";
-type Permission =
-  | "view"
-  | "download"
-  | "upload"
-  | "delete"
-  | "change_visibility";
+// Import hooks
+import { useResourceAccess } from "@/hooks/queries/useShareQueries";
+import { useShareMutations } from "@/hooks/mutations/useShareMutations";
+import type { Permission, ResourceType } from "@/config/types/shareTypes";
 
-interface UserPermission {
-  userId: string;
-  permissions: Permission[];
-}
-
-interface ShareSettings {
-  type: string;
-  visibility: Visibility;
-  users?: UserPermission[];
-  id: string;
+interface ShareModalProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  item: IFileSystemItem | null;
 }
 
 const PERMISSION_LABELS: Record<Permission, string> = {
@@ -57,7 +31,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   download: "Download",
   upload: "Upload",
   delete: "Delete",
-  change_visibility: "Change Visibility",
+  share: "Share",
 };
 
 const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
@@ -65,141 +39,138 @@ const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   download: "Can download the file",
   upload: "Can upload new versions",
   delete: "Can delete the file",
-  change_visibility: "Can update Public/Private/Restricted settings",
+  share: "Can share with others",
 };
 
-export const ShareModal = ({
+export const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   onOpenChange,
-  onSave,
-  initialSettings,
   item,
-}: {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: (settings: ShareSettings) => void;
-  initialSettings?: ShareSettings;
-  item: FileItem | null;
 }) => {
   const userList = useAppConfigStore((state) => state.userList);
+  const currentUser = useAppConfigStore((state) => state.user);
 
-  const [visibility, setVisibility] = useState<Visibility>(
-    initialSettings?.visibility || "private"
-  );
-  const [selectedUsers, setSelectedUsers] = useState<string[]>(
-    initialSettings?.users?.map((u) => u.userId) || []
-  );
-  const [userPermissions, setUserPermissions] = useState<UserPermission[]>(
-    initialSettings?.users || []
-  );
-  const [openUserPicker, setOpenUserPicker] = useState(false);
-  const [openVisibilityPicker, setOpenVisibilityPicker] = useState(false);
+  // Local state
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [userPermissions, setUserPermissions] = useState<{ userId: string; permissions: Permission[] }[]>([]);
+  const [showUserList, setShowUserList] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [existingACL, setExistingACL] = useState<ACLApi.ACL | null>(null);
 
-  // Fetch existing ACL when modal opens
+  // Determine resource type and ID
+  const resourceType: ResourceType = item?.type === "folder" ? "folder" : "document";
+  const resourceId = item?._id || "";
+
+  const {
+    data: accessData,
+    isLoading: isLoadingAccess,
+    isFetching,
+    refetch,
+  } = useResourceAccess(resourceType, resourceId, {
+    enabled: isOpen && !!resourceId,
+    refetchOnMount: true,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+
+  // Mutations
+  const {
+    shareResourceMutation,
+    updatePermissionsMutation,
+    removeAccessMutation,
+  } = useShareMutations();
+
+  // ✅ FIX: Better state management - Reset and refetch when modal opens
   useEffect(() => {
-    const fetchACL = async () => {
-      if (!item || !isOpen) return;
-
-      setLoading(true);
-      try {
-        const response = await ACLApi.getACL(item._id);
-        if (response.success && response.data) {
-          setExistingACL(response.data);
-          setVisibility(response.data.visibility);
-          
-          // Map users from ACL
-          const aclUsers = response.data.users.map(u => ({
-            userId: u.userId,
-            permissions: u.permissions as Permission[]
-          }));
-          setUserPermissions(aclUsers);
-          setSelectedUsers(aclUsers.map(u => u.userId));
-        }
-      } catch (error: any) {
-        // ACL might not exist yet, which is fine
-        if (error.response?.status !== 404) {
-          console.error("Error fetching ACL:", error);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchACL();
-  }, [item, isOpen]);
-
-  const addUserToSelection = async (userId: string) => {
-    if (!selectedUsers.includes(userId) && item) {
-      const newPermissions: Permission[] = ["view"];
+    if (isOpen && resourceId) {
+      console.log("🔄 Modal opened - resetting state and refetching");
       
+      // Reset state first
+      setSelectedUsers([]);
+      setUserPermissions([]);
+      setExpandedUsers(new Set());
+      setSearchValue("");
+      setShowUserList(false);
+      
+      // Then refetch
+      refetch();
+    }
+  }, [isOpen, resourceId]);
+
+  // ✅ FIX: Sync fetched data with local state - with proper checks
+  useEffect(() => {
+    // Only sync when modal is open and we have data (not fetching)
+    if (!isOpen || isFetching) return;
+
+    console.log("📊 Syncing data:", accessData?.data?.usersWithAccess);
+
+    if (accessData?.data?.usersWithAccess) {
+      const users = accessData.data.usersWithAccess;
+      
+      if (users.length > 0) {
+        const existingUsers = users.map((user) => user.userId);
+        const existingPermissions = users.map((user) => ({
+          userId: user.userId,
+          permissions: user.permissions,
+        }));
+
+        console.log("✅ Setting users:", existingUsers);
+        setSelectedUsers(existingUsers);
+        setUserPermissions(existingPermissions);
+      } else {
+        // Explicitly handle empty case
+        console.log("✅ No users with access - clearing state");
+        setSelectedUsers([]);
+        setUserPermissions([]);
+      }
+    }
+  }, [accessData, isOpen, isFetching]);
+
+  const addUserToSelection = (userId: string) => {
+    if (!selectedUsers.includes(userId)) {
+      const newPermissions: Permission[] = ["view"];
+
       setSelectedUsers((prev) => [...prev, userId]);
       setUserPermissions((prev) => [
         ...prev,
         { userId, permissions: newPermissions },
       ]);
-
-      // If ACL exists and visibility is restricted, add user immediately
-      if (existingACL && visibility === "restricted") {
-        try {
-          await ACLApi.addUser(item._id, userId, newPermissions);
-          toast({
-            title: "User added",
-            description: "User has been granted access with view permission",
-          });
-        } catch (error) {
-          console.error("Error adding user:", error);
-          toast({
-            title: "Error",
-            description: "Failed to add user. Please try again.",
-            variant: "destructive",
-          });
-        }
-      }
+      setExpandedUsers((prev) => new Set([...prev, userId]));
     }
     setSearchValue("");
-    setOpenUserPicker(false);
+    setShowUserList(false);
   };
 
   const removeSelectedUser = async (userId: string) => {
-    if (!item) return;
+    const hasExistingAccess = accessData?.data?.usersWithAccess.some(
+      (user) => user.userId === userId
+    );
 
-    // Remove from local state
-    setSelectedUsers((prev) => prev.filter((id) => id !== userId));
-    setUserPermissions((prev) => prev.filter((up) => up.userId !== userId));
-    setExpandedUsers((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(userId);
-      return newSet;
-    });
-
-    // If ACL exists, remove user from backend
-    if (existingACL) {
+    if (hasExistingAccess && resourceId) {
       try {
-        await ACLApi.removeUser(item._id, userId);
-        toast({
-          title: "Access removed",
-          description: "User access has been removed",
+        await removeAccessMutation.mutateAsync({
+          resourceType,
+          resourceId,
+          userId,
         });
+        // Don't need to manually refetch - mutation handles invalidation
       } catch (error) {
-        console.error("Error removing user:", error);
-        toast({
-          title: "Error",
-          description: "Failed to remove user access",
-          variant: "destructive",
-        });
+        return;
       }
+    } else {
+      // Just remove from local state if not saved yet
+      setSelectedUsers((prev) => prev.filter((id) => id !== userId));
+      setUserPermissions((prev) => prev.filter((up) => up.userId !== userId));
+      setExpandedUsers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
     }
   };
 
-  const toggleUserPermission = async (userId: string, permission: Permission) => {
-    if (!item) return;
-
-    const userPerm = userPermissions.find(up => up.userId === userId);
+  const toggleUserPermission = (userId: string, permission: Permission) => {
+    const userPerm = userPermissions.find((up) => up.userId === userId);
     if (!userPerm) return;
 
     const hasPermission = userPerm.permissions.includes(permission);
@@ -207,29 +178,16 @@ export const ShareModal = ({
       ? userPerm.permissions.filter((p) => p !== permission)
       : [...userPerm.permissions, permission];
 
-    // Update local state
-    setUserPermissions((prev) =>
-      prev.map((up) => {
-        if (up.userId === userId) {
-          return { ...up, permissions: newPermissions };
-        }
-        return up;
-      })
-    );
-
-    // Update backend if ACL exists
-    if (existingACL && visibility === "restricted") {
-      try {
-        await ACLApi.updateUserPermissions(item._id, userId, newPermissions);
-      } catch (error) {
-        console.error("Error updating permissions:", error);
-        toast({
-          title: "Error",
-          description: "Failed to update permissions",
-          variant: "destructive",
-        });
-      }
+    if (newPermissions.length === 0) {
+      toast.error("User must have at least one permission");
+      return;
     }
+
+    setUserPermissions((prev) =>
+      prev.map((up) =>
+        up.userId === userId ? { ...up, permissions: newPermissions } : up
+      )
+    );
   };
 
   const toggleExpanded = (userId: string) => {
@@ -251,161 +209,65 @@ export const ShareModal = ({
     return `${permissions.length} permissions`;
   };
 
-  const handleVisibilityChange = async (newVisibility: Visibility) => {
-    if (!item) return;
-
-    const oldVisibility = visibility;
-    setVisibility(newVisibility);
-    setOpenVisibilityPicker(false);
-
-    // Update backend if ACL exists
-    if (existingACL) {
-      try {
-        await ACLApi.updateVisibility(item._id, newVisibility);
-        toast({
-          title: "Visibility updated",
-          description: `Resource is now ${newVisibility}`,
-        });
-      } catch (error) {
-        console.error("Error updating visibility:", error);
-        setVisibility(oldVisibility); // Revert on error
-        toast({
-          title: "Error",
-          description: "Failed to update visibility",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
   const handleSave = async () => {
-    if (!item) {
-      toast({
-        title: "Error",
-        description: "No item selected for sharing",
-        variant: "destructive",
-      });
+    if (!item || !resourceId) {
+      toast.error("No item selected for sharing");
       return;
     }
 
-    setIsSaving(true);
+    const existingUserIds =
+      accessData?.data?.usersWithAccess.map((user) => user.userId) || [];
+
+    const newUsers = userPermissions.filter(
+      (up) => !existingUserIds.includes(up.userId)
+    );
+    const updatedUsers = userPermissions.filter((up) =>
+      existingUserIds.includes(up.userId)
+    );
 
     try {
-      const resourceType = item.type === "folder" ? "folder" : "file";
-
-      // Check if ACL exists
-      if (!existingACL) {
-        // Create new ACL based on visibility
-        let aclResponse;
-        
-        if (visibility === "public") {
-          aclResponse = await ACLApi.createPublicACL(item._id, resourceType);
-          console.log("Created public ACL:", aclResponse);
-        } else if (visibility === "private") {
-          aclResponse = await ACLApi.createPrivateACL(item._id, resourceType);
-          console.log("Created private ACL:", aclResponse);
-        } else if (visibility === "restricted") {
-          // Create ACL with users
-          aclResponse = await ACLApi.createACL({
-            resourceId: item._id,
-            type: resourceType,
-            visibility: "restricted",
-            users: userPermissions.map(up => ({
-              userId: up.userId,
-              permissions: up.permissions
-            })),
-          });
-          console.log("Created restricted ACL:", aclResponse);
-        }
-
-        if (aclResponse?.success) {
-          setExistingACL(aclResponse.data);
-          toast({
-            title: "Success",
-            description: "Sharing settings created successfully",
-          });
-        }
-      } else {
-        // For existing ACL, ensure all changes are synced
-        console.log("Syncing existing ACL changes...");
-        
-        // Update visibility if changed
-        if (existingACL.visibility !== visibility) {
-          await ACLApi.updateVisibility(item._id, visibility);
-          console.log("Updated visibility to:", visibility);
-        }
-
-        // For restricted visibility, sync all user permissions
-        if (visibility === "restricted") {
-          // Get current users in ACL
-          const currentUserIds = existingACL.users.map(u => u.userId);
-          const newUserIds = userPermissions.map(u => u.userId);
-
-          // Add new users
-          for (const userPerm of userPermissions) {
-            if (!currentUserIds.includes(userPerm.userId)) {
-              await ACLApi.addUser(item._id, userPerm.userId, userPerm.permissions);
-              console.log("Added user:", userPerm.userId);
-            } else {
-              // Update existing user permissions
-              await ACLApi.updateUserPermissions(item._id, userPerm.userId, userPerm.permissions);
-              console.log("Updated permissions for:", userPerm.userId);
-            }
-          }
-
-          // Remove users not in the list anymore
-          for (const userId of currentUserIds) {
-            if (!newUserIds.includes(userId)) {
-              await ACLApi.removeUser(item._id, userId);
-              console.log("Removed user:", userId);
-            }
-          }
-        }
-
-        toast({
-          title: "Success",
-          description: "Sharing settings updated successfully",
+      // Share with new users
+      if (newUsers.length > 0) {
+        await shareResourceMutation.mutateAsync({
+          resourceType,
+          resourceId,
+          users: newUsers,
         });
       }
 
-      const settings: ShareSettings = {
-        type: resourceType,
-        id: item._id,
-        visibility,
-        ...(visibility === "restricted" && { users: userPermissions }),
-      };
+      // Update existing users
+      for (const user of updatedUsers) {
+        const existingUser = accessData?.data?.usersWithAccess.find(
+          (u) => u.userId === user.userId
+        );
 
-      console.log("Final settings:", settings);
-      onSave(settings);
+        const existingPerms = [...(existingUser?.permissions || [])].sort();
+        const newPerms = [...user.permissions].sort();
+        
+        if (JSON.stringify(existingPerms) !== JSON.stringify(newPerms)) {
+          await updatePermissionsMutation.mutateAsync({
+            resourceType,
+            resourceId,
+            userId: user.userId,
+            permissions: user.permissions,
+          });
+        }
+      }
+
       onOpenChange(false);
-    } catch (error: any) {
-      console.error("Error saving ACL:", error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to save sharing settings",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
+    } catch (error) {
+      console.error("Error saving:", error);
     }
   };
 
   const handleCopyLink = async () => {
     if (!item) return;
-
     try {
       const link = `${window.location.origin}/file/${item._id}`;
       await navigator.clipboard.writeText(link);
-      toast({
-        title: "Link copied",
-        description: "Share link copied to clipboard",
-      });
+      toast.success("Link copied to clipboard");
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to copy link",
-        variant: "destructive",
-      });
+      toast.error("Failed to copy link");
     }
   };
 
@@ -414,18 +276,37 @@ export const ShareModal = ({
       .split(" ")
       .map((n) => n[0])
       .join("")
-      .toUpperCase();
+      .toUpperCase()
+      .slice(0, 2);
   };
 
-  const availableUsers = userList.filter(
-    (user) => !selectedUsers.includes(user.id)
-  );
+  const filteredUsers = userList.filter((user) => {
+    if (selectedUsers.includes(user.id)) return false;
+    if (user.id === currentUser?.id) return false;
+    if (accessData?.data?.owner && user.id === accessData.data.owner.userId) return false;
+
+    const searchLower = searchValue.toLowerCase().trim();
+    if (!searchLower) return true;
+
+    const username = user.username.toLowerCase();
+    const email = user.email.toLowerCase();
+    
+    return username.includes(searchLower) || email.includes(searchLower);
+  });
 
   const getDisplayName = () => {
     if (!item) return "File";
     if (item.type === "folder") return item.name;
     return item.extension ? `${item.name}.${item.extension}` : item.name;
   };
+
+  const isSaving =
+    shareResourceMutation.isPending ||
+    updatePermissionsMutation.isPending ||
+    removeAccessMutation.isPending;
+
+  // ✅ Show loading while fetching
+  const isLoading = isLoadingAccess || isFetching;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -436,135 +317,112 @@ export const ShareModal = ({
           </DialogTitle>
         </DialogHeader>
 
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
-            <ScrollArea className="max-h-[calc(90vh-180px)] px-6">
-              {/* Add People Section - Only for Restricted */}
-              {visibility === "restricted" && (
-                <div className="mb-6">
-                  <Popover open={openUserPicker} onOpenChange={setOpenUserPicker}>
-                    <PopoverTrigger asChild>
-                      <div className="relative">
-                        <Input
-                          placeholder="Add people, groups, spaces and calendar events"
-                          value={searchValue}
-                          onChange={(e) => {
-                            setSearchValue(e.target.value);
-                            setOpenUserPicker(true);
-                          }}
-                          className="pr-10"
-                        />
-                      </div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[500px] p-0" align="start">
-                      <Command>
-                        <CommandInput
-                          placeholder="Search users..."
-                          value={searchValue}
-                          onValueChange={setSearchValue}
-                        />
-                        <CommandList>
-                          <CommandEmpty>No users found.</CommandEmpty>
-                          <CommandGroup>
-                            {availableUsers.map((user) => (
-                              <CommandItem
-                                key={user.id}
-                                value={`${user.username} ${user.email}`}
-                                onSelect={() => addUserToSelection(user.id)}
-                                className="flex items-center gap-3 py-3 cursor-pointer"
-                              >
-                                <Avatar className="h-10 w-10">
-                                  <AvatarImage
-                                    src={user.profilePic}
-                                    alt={user.username}
-                                  />
-                                  <AvatarFallback>
-                                    {getInitials(user.username)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col overflow-hidden flex-1">
-                                  <span className="font-medium text-sm truncate">
-                                    {user.username}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground truncate">
-                                    {user.email}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+            <div className="px-6">
+              <div className="mb-6 relative">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Click to add users or search..."
+                    value={searchValue}
+                    onChange={(e) => {
+                      setSearchValue(e.target.value);
+                      if (!showUserList) setShowUserList(true);
+                    }}
+                    onFocus={() => setShowUserList(true)}
+                    onClick={() => setShowUserList(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowUserList(false), 200);
+                    }}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
-              )}
 
-              {/* People with Access */}
-              {visibility === "restricted" && selectedUsers.length > 0 && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-base font-semibold">People with access</h3>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={handleCopyLink}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Mail className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    {/* Owner (You) */}
-                    <div className="flex items-center gap-3 py-2 px-2 rounded hover:bg-muted">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>A</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">Abhishek Sharma (you)</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          abhishek.sharma@digihost.in
-                        </p>
+                {showUserList && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                    {filteredUsers.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-gray-500">
+                        {searchValue ? "No users found" : "No more users to add"}
                       </div>
-                      <span className="text-sm text-muted-foreground">Owner</span>
-                    </div>
+                    ) : (
+                      filteredUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            addUserToSelection(user.id);
+                          }}
+                          className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 cursor-pointer transition-colors"
+                        >
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={user.profilePic} />
+                            <AvatarFallback className="text-xs">
+                              {getInitials(user.username)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium">{user.username}</div>
+                            <div className="text-xs text-gray-500 truncate">
+                              {user.email}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
 
-                    {/* Selected Users */}
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold mb-3">People with access</h3>
+
+                <ScrollArea className="max-h-[400px]">
+                  <div className="space-y-2">
+                    {accessData?.data?.owner && (
+                      <div className="flex items-center gap-3 py-2 px-3 rounded-lg bg-gray-50">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={accessData.data.owner.profilePic} />
+                          <AvatarFallback className="bg-slate-600 text-white">
+                            {getInitials(accessData.data.owner.username)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">
+                            {accessData.data.owner.username}
+                            {accessData.data.owner.userId === currentUser?.id && " (you)"}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {accessData.data.owner.email}
+                          </p>
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">Owner</span>
+                      </div>
+                    )}
+
                     {selectedUsers.map((userId) => {
                       const user = userList.find((u) => u.id === userId);
-                      const userPerm = userPermissions.find(
-                        (up) => up.userId === userId
-                      );
+                      const userPerm = userPermissions.find((up) => up.userId === userId);
                       const isExpanded = expandedUsers.has(userId);
 
                       if (!user || !userPerm) return null;
 
                       return (
-                        <div key={userId} className="border rounded-lg">
-                          {/* User Header */}
-                          <div className="flex items-center gap-3 py-2 px-2 hover:bg-muted">
+                        <div key={userId} className="border rounded-lg hover:border-gray-300 transition-colors">
+                          <div className="flex items-center gap-3 py-2 px-3">
                             <Avatar className="h-10 w-10">
-                              <AvatarImage
-                                src={user.profilePic}
-                                alt={user.username}
-                              />
+                              <AvatarImage src={user.profilePic} />
                               <AvatarFallback>
                                 {getInitials(user.username)}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium">{user.username}</p>
-                              <p className="text-xs text-muted-foreground truncate">
+                              <p className="text-xs text-gray-500 truncate">
                                 {user.email}
                               </p>
                             </div>
@@ -572,196 +430,93 @@ export const ShareModal = ({
                               variant="ghost"
                               size="sm"
                               onClick={() => toggleExpanded(userId)}
-                              className="h-8"
+                              className="text-xs hover:bg-gray-100"
                             >
-                              <span className="text-xs mr-1">
-                                {getPermissionSummary(userPerm.permissions)}
-                              </span>
+                              {getPermissionSummary(userPerm.permissions)}
                               <ChevronDown
-                                className={`h-4 w-4 transition-transform ${
+                                className={`ml-1 h-4 w-4 transition-transform ${
                                   isExpanded ? "rotate-180" : ""
                                 }`}
                               />
                             </Button>
                           </div>
 
-                          {/* Expanded Permissions */}
                           {isExpanded && (
-                            <div className="px-4 py-3 bg-muted/30 border-t">
-                              <div className="space-y-3">
-                                {(
-                                  [
-                                    "view",
-                                    "download",
-                                    "upload",
-                                    "delete",
-                                    "change_visibility",
-                                  ] as Permission[]
-                                ).map((permission) => (
-                                  <div
-                                    key={permission}
-                                    className="flex items-start gap-3"
-                                  >
-                                    <Checkbox
-                                      id={`${userId}-${permission}`}
-                                      checked={userPerm.permissions.includes(
-                                        permission
-                                      )}
-                                      onCheckedChange={() =>
-                                        toggleUserPermission(userId, permission)
-                                      }
-                                      className="mt-0.5"
-                                    />
-                                    <Label
-                                      htmlFor={`${userId}-${permission}`}
-                                      className="cursor-pointer flex-1"
-                                    >
-                                      <div className="font-medium text-sm">
-                                        {PERMISSION_LABELS[permission]}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {PERMISSION_DESCRIPTIONS[permission]}
-                                      </div>
-                                    </Label>
-                                  </div>
-                                ))}
+                            <div className="px-4 py-3 bg-gray-50 border-t">
+                              <div className="space-y-3 mb-3">
+                                {(["view", "download", "upload", "delete", "share"] as Permission[]).map(
+                                  (permission) => (
+                                    <div key={permission} className="flex items-start gap-3">
+                                      <Checkbox
+                                        id={`${userId}-${permission}`}
+                                        checked={userPerm.permissions.includes(permission)}
+                                        onCheckedChange={() =>
+                                          toggleUserPermission(userId, permission)
+                                        }
+                                        className="mt-1"
+                                      />
+                                      <Label
+                                        htmlFor={`${userId}-${permission}`}
+                                        className="cursor-pointer text-sm flex-1"
+                                      >
+                                        <div className="font-medium">
+                                          {PERMISSION_LABELS[permission]}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          {PERMISSION_DESCRIPTIONS[permission]}
+                                        </div>
+                                      </Label>
+                                    </div>
+                                  )
+                                )}
                               </div>
                               <Separator className="my-3" />
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeSelectedUser(userId)}
+                                disabled={removeAccessMutation.isPending}
                                 className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
-                                Remove access
+                                {removeAccessMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Removing...
+                                  </>
+                                ) : (
+                                  "Remove access"
+                                )}
                               </Button>
                             </div>
                           )}
                         </div>
                       );
                     })}
+
+                    {selectedUsers.length === 0 && (
+                      <div className="text-center py-8 text-gray-500 text-sm">
+                        No users have been given access yet. Add users above to share.
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-
-              <Separator className="my-6" />
-
-              {/* General Access */}
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold">General access</h3>
-
-                <Popover
-                  open={openVisibilityPicker}
-                  onOpenChange={setOpenVisibilityPicker}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between h-auto py-3 px-4"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 bg-green-100">
-                          <AvatarFallback className="bg-green-100">
-                            {visibility === "restricted"
-                              ? "🔒"
-                              : visibility === "public"
-                              ? "🌐"
-                              : "👤"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="text-left">
-                          <div className="font-medium text-sm">
-                            {visibility === "restricted"
-                              ? "Restricted"
-                              : visibility === "public"
-                              ? "Anyone with the link"
-                              : "Private"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {visibility === "restricted"
-                              ? "Only people with access can open with the link"
-                              : visibility === "public"
-                              ? "Anyone on the Internet with the link can view"
-                              : "Only you can access"}
-                          </div>
-                        </div>
-                      </div>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[500px] p-2" align="start">
-                    <RadioGroup
-                      value={visibility}
-                      onValueChange={handleVisibilityChange}
-                    >
-                      <div className="space-y-1">
-                        {/* Restricted */}
-                        <Label
-                          htmlFor="restricted"
-                          className="flex items-center gap-3 p-3 rounded hover:bg-muted cursor-pointer"
-                        >
-                          <RadioGroupItem value="restricted" id="restricted" />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">Restricted</div>
-                            <div className="text-xs text-muted-foreground">
-                              Only people with access can open with the link
-                            </div>
-                          </div>
-                        </Label>
-
-                        {/* Public */}
-                        <Label
-                          htmlFor="public"
-                          className="flex items-center gap-3 p-3 rounded hover:bg-muted cursor-pointer"
-                        >
-                          <RadioGroupItem value="public" id="public" />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">
-                              Anyone with the link
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Anyone on the Internet with the link can view
-                            </div>
-                          </div>
-                        </Label>
-
-                        {/* Private */}
-                        <Label
-                          htmlFor="private"
-                          className="flex items-center gap-3 p-3 rounded hover:bg-muted cursor-pointer"
-                        >
-                          <RadioGroupItem value="private" id="private" />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">Private</div>
-                            <div className="text-xs text-muted-foreground">
-                              Only you can access
-                            </div>
-                          </div>
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </PopoverContent>
-                </Popover>
+                </ScrollArea>
               </div>
-            </ScrollArea>
+            </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t flex justify-between items-center">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleCopyLink}
-              >
+            <div className="px-6 py-4 border-t flex justify-between items-center bg-gray-50">
+              <Button variant="outline" size="sm" onClick={handleCopyLink}>
                 <Copy className="h-4 w-4 mr-2" />
                 Copy link
               </Button>
-              <Button 
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Done
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {isSaving ? "Saving..." : "Save"}
+                </Button>
+              </div>
             </div>
           </>
         )}

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import DOMPurify from "dompurify";
-import { ALLOWED_EXTENSIONS } from "../helper/fileUploadHelper";
 
 /* =======================================================
    SANITIZATION HELPER
@@ -14,7 +13,7 @@ const sanitize = (value: string) => {
 };
 
 /* =======================================================
-   ZOD VALIDATION SCHEMAS
+   ZOD VALIDATION SCHEMAS - ALIGNED WITH BACKEND
    ======================================================= */
 
 // Create folder
@@ -25,7 +24,7 @@ export const createFolderSchema = z.object({
     .max(100, "Folder name too long")
     .regex(/^[a-zA-Z0-9\s\-_&()]+$/, "Invalid characters in folder name")
     .transform(sanitize),
-  parent_id: z
+  parentId: z
     .string()
     .regex(/^[0-9a-fA-F]{24}$/, "Invalid parent ID")
     .transform(sanitize),
@@ -41,15 +40,6 @@ export const createFolderSchema = z.object({
     .optional(),
 });
 
-// Get root folders
-export const getRootFoldersSchema = z.object({
-  departmentId: z
-    .string()
-    .regex(/^[0-9a-fA-F]{24}$/, "Invalid department ID")
-    .transform(sanitize),
-  includeDeleted: z.boolean().default(false).optional(),
-});
-
 // Get folder by ID
 export const folderIdSchema = z.object({
   id: z
@@ -58,68 +48,33 @@ export const folderIdSchema = z.object({
     .transform(sanitize),
 });
 
+// Get child folders query params
 export const getChildFoldersSchema = z.object({
   includeDeleted: z
-    .string()
+    .union([z.boolean(), z.string()])
     .optional()
-    .transform((val) => val === "true"),
+    .transform((val) => {
+      if (typeof val === "string") return val === "true";
+      return val || false;
+    }),
   type: z.string().optional(),
-  userEmail: z.string().optional(),
-});
-
-export type GetChildFoldersQuery = z.infer<typeof getChildFoldersSchema>;
-
-// Response type based on backend
-export interface GetChildFoldersResponse {
-  success: boolean;
-  count: number;
-  mode: "direct" | "nested";
-  filters: {
-    type: string | null;
-    extension: string | null;
-    userEmail: string | null;
-    search: string | null;
-  };
-  data: Array<{
-    _id: string;
-    name: string;
-    type: "folder" | "documents";
-    extension?: string;
-    createdBy?: {
-      email: string;
-      name: string;
-    };
-    updatedBy?: {
-      email: string;
-      name: string;
-    };
-    path?: string;
-    parentPath?: string;
-    depth?: number;
-    parentId?: string;
-    isDeleted?: boolean;
-    // ... other folder/document fields
-  }>;
-}
-
-
-
-// Get all descendants query
-export const getAllDescendantsSchema = z.object({
-  includeDeleted: z.boolean().default(false).optional(),
-  type: z.enum(["folder", "document"]).optional(),
+  userEmail: z.string().email("Invalid email format").optional(),
 });
 
 // Update folder
 export const updateFolderSchema = z.object({
   name: z
     .string()
-    .min(1)
-    .max(100)
-    .regex(/^[a-zA-Z0-9\s\-_&()]+$/)
+    .min(1, "Folder name is required")
+    .max(100, "Folder name too long")
+    .regex(/^[a-zA-Z0-9\s\-_&()]+$/, "Invalid characters in folder name")
     .transform(sanitize)
     .optional(),
-  description: z.string().max(500).transform(sanitize).optional(),
+  description: z
+    .string()
+    .max(500, "Description too long")
+    .transform(sanitize)
+    .optional(),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Invalid color format")
@@ -141,16 +96,35 @@ export const searchFoldersSchema = z.object({
     .min(1, "Search query is required")
     .max(100, "Search query too long")
     .transform(sanitize),
-  departmentName: z.string().max(100).transform(sanitize).optional(),
+  departmentId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, "Invalid department ID")
+    .transform(sanitize)
+    .optional(),
 });
 
-// Get folder by path
-export const getFolderByPathSchema = z.object({
-  path: z
-    .string()
-    .min(1, "Path is required")
-    .max(500, "Path too long")
-    .transform(sanitize),
+// Share folder
+export const shareFolderSchema = z.object({
+  users: z
+    .array(
+      z.object({
+        userId: z
+          .string()
+          .regex(/^[0-9a-fA-F]{24}$/, "Invalid user ID"),
+        permissions: z.array(z.string()).min(1, "At least one permission required"),
+      })
+    )
+    .optional(),
+  groups: z
+    .array(
+      z.object({
+        groupId: z
+          .string()
+          .regex(/^[0-9a-fA-F]{24}$/, "Invalid group ID"),
+        permissions: z.array(z.string()).min(1, "At least one permission required"),
+      })
+    )
+    .optional(),
 });
 
 /* =======================================================
@@ -158,11 +132,9 @@ export const getFolderByPathSchema = z.object({
    ======================================================= */
 
 export type CreateFolderInput = z.infer<typeof createFolderSchema>;
-export type GetRootFoldersInput = z.infer<typeof getRootFoldersSchema>;
 export type FolderIdInput = z.infer<typeof folderIdSchema>;
 export type GetChildFoldersInput = z.infer<typeof getChildFoldersSchema>;
-export type GetAllDescendantsInput = z.infer<typeof getAllDescendantsSchema>;
 export type UpdateFolderInput = z.infer<typeof updateFolderSchema>;
 export type MoveFolderInput = z.infer<typeof moveFolderSchema>;
 export type SearchFoldersInput = z.infer<typeof searchFoldersSchema>;
-export type GetFolderByPathInput = z.infer<typeof getFolderByPathSchema>;
+export type ShareFolderInput = z.infer<typeof shareFolderSchema>;

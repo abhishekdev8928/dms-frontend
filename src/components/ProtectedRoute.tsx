@@ -1,39 +1,30 @@
-// frontend/src/components/ProtectedRoute.jsx
+import { Navigate } from "react-router-dom";
+import { useUser, useIsAuthenticated } from "@/config/store/authStore";
+import type { ReactNode } from "react";
 
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuthStore } from '@/config/store/authStore';
+// export type Role = "ADMIN" | "SUPER_ADMIN" | "USER" | "DEPT_OWNER";
 
-/**
- * ProtectedRoute - Simple role-based route protection
- * 
- * @param {Array<string>} allowedRoles - Array of roles that can access this route
- * @param {React.Component} children - Child component to render
- * @param {string} redirectTo - Where to redirect if unauthorized (default: '/unauthorized')
- */
-export const ProtectedRoute = ({ 
-  allowedRoles = [], 
-  children,
-  redirectTo = '/unauthorized' 
-}) => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const user = useAuthStore((state) => state.user);
-  const userRole = user?.role;
+interface ProtectedRouteProps {
+  allowedRoles?: string[];   
+  children: ReactNode;     
+}
 
-  // Check if user is logged in
-  if (!isAuthenticated) {
+export const ProtectedRoute = ({ allowedRoles = [], children }: ProtectedRouteProps) => {
+  const isAuthenticated = useIsAuthenticated();
+  const user = useUser();
+
+  // If not logged in → go to login page
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  // If no roles specified, just check authentication
-  if (allowedRoles.length === 0) {
-    return children ? children : <Outlet />;
+  // If roles provided & user.role not matching → go to no-access page
+  if (allowedRoles.length > 0 && user.role && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/dashboard/home" replace />;
   }
 
-  // Check if user's role is in allowed roles
-  if (allowedRoles.includes(userRole)) {
-    return children ? children : <Outlet />;
-  }
-
-  // User doesn't have required role - redirect
-  return <Navigate to={redirectTo} replace />;
+  // Access allowed → render component
+  return <>{children}</>;
 };
+
+export default ProtectedRoute;
