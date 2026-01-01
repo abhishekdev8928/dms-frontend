@@ -10,7 +10,6 @@ import type {
   IDownloadUrlResponse,
   IShareDocumentResponse,
   IChunkedUploadInitResponse,
-  IChunkUploadResponse,
   IDocumentStatsResponse,
   IGeneratePresignedUrlsPayload,
   ICreateDocumentPayload,
@@ -22,7 +21,6 @@ import type {
   ITagsPayload,
   IShareDocumentPayload,
   IInitiateChunkedUploadPayload,
-  IUploadChunkPayload,
   ICompleteChunkedUploadPayload,
   IAbortChunkedUploadPayload,
 } from '@/config/types/documentTypes';
@@ -54,11 +52,12 @@ export async function createDocument(
 }
 
 /* =======================================================
-   CHUNKED UPLOAD (Large Files)
+   CHUNKED UPLOAD (Large Files) - DIRECT S3 UPLOAD
    ======================================================= */
 
 /**
  * Initiate chunked upload for files >100MB
+ * Returns presigned URLs for direct S3 upload
  * @route POST /api/documents/chunked/initiate
  */
 export async function initiateChunkedUpload(
@@ -69,45 +68,7 @@ export async function initiateChunkedUpload(
 }
 
 /**
- * Upload a single chunk
- * @route POST /api/documents/chunked/upload
- */
-
-
-export const uploadChunk = async ({
-  uploadId,
-  key,
-  partNumber,
-  chunk,
-}: {
-  uploadId: string;
-  key: string;
-  partNumber: number;
-  chunk: Blob;
-}) => {
-  // Convert Blob to base64
-  const base64Chunk = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      // Remove the data URL prefix (e.g., "data:application/octet-stream;base64,")
-      const base64Data = base64.split(',')[1];
-      resolve(base64Data);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(chunk);
-  });
-
-  return httpClient.post('/documents/chunked/upload', {
-    uploadId,
-    key,
-    partNumber,
-    body: base64Chunk,  // ✅ Correct field name
-  });
-};
-
-/**
- * Complete chunked upload
+ * Complete chunked upload and create document record
  * @route POST /api/documents/chunked/complete
  */
 export async function completeChunkedUpload(
@@ -118,7 +79,7 @@ export async function completeChunkedUpload(
 }
 
 /**
- * Abort chunked upload
+ * Abort chunked upload and cleanup S3
  * @route POST /api/documents/chunked/abort
  */
 export async function abortChunkedUpload(
@@ -336,7 +297,7 @@ export async function getDepartmentStats(
    ======================================================= */
 
 /**
- * Helper: Upload file with progress tracking
+ * Helper: Upload file with progress tracking (Direct Upload)
  */
 export async function uploadFileWithProgress(
   file: File,
@@ -354,7 +315,7 @@ export async function uploadFileWithProgress(
     parentId,
   });
 
-  const { url, key, filename } = presignedData[0];
+  const { url, key } = presignedData[0];
 
   // 2. Upload to S3 with progress
   await new Promise<void>((resolve, reject) => {
@@ -387,8 +348,10 @@ export async function uploadFileWithProgress(
 
   // 3. Create document record
   const extension = file.name.split('.').pop() || '';
+  const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+  
   return await createDocument({
-    name: file.name,
+    name: nameWithoutExt,
     originalName: file.name,
     parentId,
     fileUrl: key,

@@ -5,7 +5,6 @@ import {
   generatePresignedUrls,
   createDocument,
   initiateChunkedUpload,
-  uploadChunk,
   completeChunkedUpload,
   abortChunkedUpload,
 } from "@/config/api/documentApi";
@@ -151,8 +150,13 @@ export const validateFiles = (files: File[]): {
 };
 
 /* =======================================================
-   CHUNKED UPLOAD IMPLEMENTATION
+   CHUNKED UPLOAD IMPLEMENTATION (FIXED - DIRECT S3)
    ======================================================= */
+
+/**
+ * ✅ COMPLETE FIX for uploadFileChunked
+ * Replace this entire function in your fileUploadHelper.ts
+ */
 
 async function uploadFileChunked(
   file: File,
@@ -160,13 +164,16 @@ async function uploadFileChunked(
   uploadId: string,
   abortController: AbortController
 ): Promise<UploadedFileInfo> {
-  const { setStatus, updateChunkProgress } = useUploadStore.getState();
   const extension = getFileExtension(file.name);
-  const totalChunks = calculateTotalChunks(file.size);
+
+  let s3UploadId: string | undefined;
+  let s3Key: string | undefined;
 
   try {
-    // Step 1: Initiate chunked upload
-    setStatus(uploadId, 'Pending Upload');
+    // ====================================
+    // STEP 1: INITIATE CHUNKED UPLOAD
+    // ====================================
+    useUploadStore.getState().setStatus(uploadId, 'Uploading File');
     
     const initResponse = await initiateChunkedUpload({
       filename: file.name,
@@ -175,69 +182,118 @@ async function uploadFileChunked(
       parentId,
     });
 
-    const { uploadId: s3UploadId, key } = initResponse.data;
+    const {
+      uploadId: backendUploadId,
+      key,
+      chunkSize: backendChunkSize,
+      totalParts,
+      presignedUrls,
+    } = initResponse.data;
 
-    // Step 2: Upload chunks
-    setStatus(uploadId, 'Uploading File');
+    s3UploadId = backendUploadId;
+    s3Key = key;
+
+    console.log(`📤 Chunked upload initiated:`, {
+      uploadId: s3UploadId,
+      key: s3Key,
+      totalParts,
+      chunkSize: backendChunkSize,
+      presignedUrlsCount: presignedUrls.length,
+    });
+
+    // ✅ CRITICAL FIX: Update totalChunks with backend's actual value
+    useUploadStore.getState().updateTotalChunks(uploadId, totalParts);
+
+    // ====================================
+    // STEP 2: UPLOAD CHUNKS DIRECTLY TO S3
+    // ====================================
     const uploadedParts: ChunkUploadPart[] = [];
     let uploadedChunks = 0;
 
-    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-      // Check if cancelled
+    for (let i = 0; i < presignedUrls.length; i++) {
       if (abortController.signal.aborted) {
-        throw new Error('Upload cancelled');
+        throw new Error('Upload cancelled by user');
       }
 
-      const start = chunkIndex * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const { partNumber, url: presignedUrl } = presignedUrls[i];
+      const start = (partNumber - 1) * backendChunkSize;
+      const end = Math.min(start + backendChunkSize, file.size);
       const chunk = file.slice(start, end);
-      const partNumber = chunkIndex + 1;
+
+      console.log(`📦 Uploading chunk ${partNumber}/${totalParts} (${chunk.size} bytes)`);
 
       try {
-        const chunkResponse = await uploadChunk({
-          uploadId: s3UploadId,
-          key,
-          partNumber,
-          chunk,
+        const s3Response = await axios.put(presignedUrl, chunk, {
+          headers: {
+            'Content-Type': file.type,
+          },
+          signal: abortController.signal,
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const chunkProgress = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              console.log(`  Chunk ${partNumber} internal progress: ${chunkProgress}%`);
+            }
+          },
         });
 
-        console.log(chunkResponse.data.data.ETag)
+        const etag = s3Response.headers.etag || s3Response.headers.ETag;
+        
+        if (!etag) {
+          throw new Error(`No ETag received for part ${partNumber}`);
+        }
+
+        const cleanETag = etag.replace(/"/g, '');
 
         uploadedParts.push({
           PartNumber: partNumber,
-          ETag: chunkResponse.data.data.ETag,
+          ETag: cleanETag,
         });
 
+        // ✅ INCREMENT AND UPDATE PROGRESS
         uploadedChunks++;
-        updateChunkProgress(uploadId, uploadedChunks);
+        useUploadStore.getState().updateChunkProgress(uploadId, uploadedChunks);
+
+        const overallProgress = Math.round((uploadedChunks / totalParts) * 100);
+        console.log(`✅ Chunk ${partNumber}/${totalParts} uploaded successfully`);
+        console.log(`📊 Overall progress: ${overallProgress}% (${uploadedChunks}/${totalParts} chunks)`);
 
       } catch (chunkError: any) {
-        console.error(`Failed to upload chunk ${partNumber}:`, chunkError);
+        console.error(`❌ Failed to upload chunk ${partNumber}:`, chunkError);
         
-        // Abort the multipart upload on S3
-        await abortChunkedUpload({ uploadId: s3UploadId, key });
-        throw new Error(`Chunk ${partNumber} upload failed`);
+        if (s3UploadId && s3Key) {
+          console.log('🧹 Aborting multipart upload on S3...');
+          await abortChunkedUpload({ uploadId: s3UploadId, key: s3Key });
+        }
+        
+        throw new Error(`Chunk ${partNumber} upload failed: ${chunkError.message}`);
       }
     }
 
-    // Step 3: Complete upload and create document
-    setStatus(uploadId, 'Processing File');
+    // ====================================
+    // STEP 3: COMPLETE UPLOAD
+    // ====================================
+    useUploadStore.getState().setStatus(uploadId, 'Processing File');
+
+    console.log(`🔗 Completing multipart upload with ${uploadedParts.length} parts`);
 
     const completeResponse = await completeChunkedUpload({
-  uploadId: s3UploadId,
-  key,
-  parts: uploadedParts,
-  parentId,
-  name: file.name,
-  mimeType: file.type,
-  fileSize: file.size,
-});
-
+      uploadId: s3UploadId,
+      key: s3Key,
+      parts: uploadedParts,
+      name: file.name,
+      parentId,
+      mimeType: file.type,
+      fileSize: file.size,
+    });
 
     const fileCategory = getFileCategory(file.type, extension);
 
+    console.log(`✅ Chunked upload completed successfully:`, completeResponse.data);
+
     return {
-      id: completeResponse.data._id,
+      id: completeResponse.data.document._id,
       name: file.name,
       extension,
       type: fileCategory,
@@ -245,16 +301,28 @@ async function uploadFileChunked(
     };
 
   } catch (error: any) {
-    if (axios.isCancel(error) || error.name === 'CanceledError' || error.message === 'Upload cancelled') {
-      setStatus(uploadId, 'Upload Cancelled');
+    if (axios.isCancel(error) || error.name === 'CanceledError' || error.message === 'Upload cancelled by user') {
+      useUploadStore.getState().setStatus(uploadId, 'Upload Cancelled');
+      
+      if (s3UploadId && s3Key) {
+        try {
+          await abortChunkedUpload({ uploadId: s3UploadId, key: s3Key });
+          console.log('🧹 Multipart upload aborted successfully');
+        } catch (abortError) {
+          console.error('Failed to abort multipart upload:', abortError);
+        }
+      }
     } else {
-      setStatus(uploadId, 'Upload Failed', error.message || 'Chunked upload failed');
+      useUploadStore.getState().setStatus(uploadId, 'Upload Failed', error.message || 'Chunked upload failed');
     }
+    
     throw error;
   }
 }
 
-
+/* =======================================================
+   DIRECT UPLOAD IMPLEMENTATION (FILES < 100MB)
+   ======================================================= */
 
 async function uploadFileDirect(
   file: File,
@@ -318,7 +386,9 @@ async function uploadFileDirect(
   }
 }
 
-
+/* =======================================================
+   MAIN UPLOAD FUNCTION
+   ======================================================= */
 
 export const uploadFiles = async (
   files: File[],
@@ -349,6 +419,12 @@ export const uploadFiles = async (
       } else {
         directUploadFiles.push(file);
       }
+    });
+
+    console.log(`📊 Upload summary:`, {
+      total: files.length,
+      direct: directUploadFiles.length,
+      chunked: chunkedUploadFiles.length,
     });
 
     // Step 1: Generate presigned URLs for direct uploads
@@ -497,4 +573,4 @@ export const uploadFiles = async (
     onError?.(error);
     throw error;
   }
-};
+}
